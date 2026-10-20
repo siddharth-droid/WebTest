@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { asset } from '@/lib/asset';
 import { FLEET, PLANE_IDS, type FleetSatellite, type SatelliteClass } from '@/lib/fleet';
 import { simNow, TIME_WARP } from '@/lib/orbit';
 import { groundTrack, telemetryAt, type Telemetry } from '@/lib/telemetry';
@@ -272,7 +273,7 @@ function GroundTrack({ sat, t }: { sat: FleetSatellite; t: number }) {
         <span>Next orbit</span>
       </div>
       <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="img" aria-label={`Ground track of ${sat.name}`}>
-        <image href="/textures/earth_map_640.jpg" width={MAP_W} height={MAP_H} opacity={0.5} style={{ filter: 'grayscale(1) contrast(1.2)' }} />
+        <image href={asset('/textures/earth_map_640.jpg')} width={MAP_W} height={MAP_H} opacity={0.5} style={{ filter: 'grayscale(1) contrast(1.2)' }} />
         {[1, 2, 3].map((i) => (
           <line key={`h${i}`} x1={0} x2={MAP_W} y1={(i * MAP_H) / 4} y2={(i * MAP_H) / 4} stroke="rgb(232 237 245 / 0.1)" />
         ))}

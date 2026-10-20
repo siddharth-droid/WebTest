@@ -4,10 +4,11 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { asset } from '@/lib/asset';
 import { upgradeMaterial } from '@/lib/materials';
 import { story, type HotspotKey } from '@/lib/story';
 
-const MODEL = '/models/landsat8.glb';
+const MODEL = asset('/models/landsat8.glb');
 
 // Parts that make up the spacecraft body (the wing's frame reuses bronze/grey, so those are excluded)
 const BUS_PARTS = /^LDCM-(gold-cyl|silver|white-sm|darkbronze)/;

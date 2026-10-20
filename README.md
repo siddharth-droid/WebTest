@@ -2,6 +2,8 @@
 
 A scroll-driven 3D site and a live fleet console for a (fictional) constellation of compute satellites. Built on the stack most award-winning WebGL sites use.
 
+**Live:** https://siddharth-droid.github.io/WebTest/ · Fleet console: https://siddharth-droid.github.io/WebTest/fleet/
+
 ![Hero](docs/01-hero.jpg)
 
 | Power | Compute | Network |
@@ -15,9 +17,13 @@ A scroll-driven 3D site and a live fleet console for a (fictional) constellation
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm run build && npm start
+npm run build      # static export to out/
 npm run lint && npm run typecheck
 ```
+
+## Deploy
+
+`.github/workflows/deploy-pages.yml` builds a static export and publishes it to GitHub Pages on every push. `NEXT_PUBLIC_BASE_PATH` sets the sub-path (`/WebTest`), and `src/lib/asset.ts` prefixes model and texture URLs with it.
 
 ## Routes
 

@@ -10,11 +10,12 @@ import {
   surfaceFragment,
   surfaceVertex,
 } from '@/lib/shaders/earth';
+import { asset } from '@/lib/asset';
 
 const TEXTURES = {
-  day: '/textures/earth_day_4096.jpg',
-  night: '/textures/earth_night_4096.jpg',
-  brc: '/textures/earth_bump_roughness_clouds_4096.jpg',
+  day: asset('/textures/earth_day_4096.jpg'),
+  night: asset('/textures/earth_night_4096.jpg'),
+  brc: asset('/textures/earth_bump_roughness_clouds_4096.jpg'),
 };
 
 interface EarthProps {
