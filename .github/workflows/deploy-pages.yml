@@ -1,10 +1,13 @@
 name: Deploy to GitHub Pages
 
-# Builds the static export and publishes it to the gh-pages branch,
+# Fetches open space data, builds the static export and publishes it to the gh-pages branch,
 # which GitHub Pages serves at https://<owner>.github.io/<repo>/
 on:
   push:
     branches: [main]
+  # Refresh the open data every 3 hours (CelesTrak asks for no more than every 2)
+  schedule:
+    - cron: '23 */3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -24,6 +27,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Fetch open data
+        run: node scripts/fetch-data.mjs
+        env:
+          FALLBACK_BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
       - run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
