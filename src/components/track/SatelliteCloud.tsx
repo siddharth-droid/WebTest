@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { Catalog } from '@/lib/sat/catalog';
 import { groupOf } from '@/lib/sat/groups';
 import type { LiveSnapshot } from './useLiveCatalog';
+import { RADIANCE } from '@/components/globe/units';
 
 const vertex = /* glsl */ `
 attribute vec3 aVel;
@@ -43,6 +44,7 @@ void main() {
 `;
 
 const fragment = /* glsl */ `
+uniform float uScale;
 varying vec3 vColor;
 varying float vAlpha;
 varying float vRing;
@@ -52,7 +54,7 @@ void main() {
   if (d > 0.5) discard;
   // Selected: hollow ring. Others: soft dot.
   float a = vRing > 0.5 ? smoothstep(0.5, 0.42, d) * smoothstep(0.28, 0.36, d) : smoothstep(0.5, 0.25, d);
-  gl_FragColor = vec4(vColor, a * vAlpha);
+  gl_FragColor = vec4(vColor * uScale, a * vAlpha);
 }
 `;
 
@@ -100,6 +102,7 @@ export function SatelliteCloud({ catalog, live, visibleCategories, selected, hov
       uHovered: { value: -1 },
       uPixelRatio: { value: 1 },
       uSize: { value: 2.2 },
+      uScale: { value: RADIANCE * 1.5 },
     }),
     [],
   );

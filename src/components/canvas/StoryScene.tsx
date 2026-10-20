@@ -6,20 +6,57 @@ import * as THREE from 'three';
 import { story } from '@/lib/story';
 import { Earth } from './Earth';
 import { Satellite } from './Satellite';
-import { Starfield } from './Starfield';
 import { SpaceLighting } from './SpaceLighting';
 import { RealConstellation } from './RealConstellation';
-import { Effects } from './Effects';
+import { GlobeAtmosphere, GlobeEffects } from '@/components/globe/Globe';
 
-const SUN = new THREE.Vector3(1, 0.4, 0.45).normalize();
-const EARTH_RADIUS = 12;
-const EARTH_POSITION: [number, number, number] = [0, -16.5, -9];
+const EARTH_R = 6;
+/** ISS altitude, 420 km, in scene units. */
+const ORBIT_R = EARTH_R * (1 + 420 / 6371);
+const INCLINATION = THREE.MathUtils.degToRad(51.6);
+/** The station is drawn ~1000× life size so it reads at this scale. */
+const ISS_SIZE = 0.17;
 
-/** Copies the scroll-driven numbers in `story` onto the camera every frame. */
-function CameraRig() {
-  const look = useMemo(() => new THREE.Vector3(), []);
+// Orbit plane basis: P(u) = r (cos u · E1 + sin u · E2)
+const E1 = new THREE.Vector3(1, 0, 0);
+const E2 = new THREE.Vector3(0, Math.sin(INCLINATION), -Math.cos(INCLINATION));
+const NORMAL = new THREE.Vector3().crossVectors(E1, E2);
+
+/** Sun overhead a little before the hero position, so the chase ends crossing into night. */
+const SUN = new THREE.Vector3()
+  .addScaledVector(E1, Math.cos(0.32))
+  .addScaledVector(E2, Math.sin(0.32))
+  .addScaledVector(NORMAL, 0.28)
+  .normalize();
+
+/** Wide establishing shot of the whole planet, on the daylit side. */
+const GLOBAL_CAM = new THREE.Vector3().copy(SUN).applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.55).multiplyScalar(EARTH_R * 3.6).add(new THREE.Vector3(0, EARTH_R * 0.7, 0));
+
+function orbitFrame(u: number, pos: THREE.Vector3, fwd: THREE.Vector3, up: THREE.Vector3, right: THREE.Vector3) {
+  pos.copy(E1).multiplyScalar(Math.cos(u)).addScaledVector(E2, Math.sin(u)).multiplyScalar(ORBIT_R);
+  fwd.copy(E1).multiplyScalar(-Math.sin(u)).addScaledVector(E2, Math.cos(u)).normalize();
+  up.copy(pos).normalize();
+  right.crossVectors(fwd, up).normalize();
+}
+
+/** Camera and station both follow `story`: the station along its orbit, the camera in its frame. */
+function Rig({ station }: { station: React.RefObject<THREE.Group | null> }) {
+  const v = useMemo(
+    () => ({
+      pos: new THREE.Vector3(),
+      fwd: new THREE.Vector3(),
+      up: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      cam: new THREE.Vector3(),
+      look: new THREE.Vector3(),
+      gl: new THREE.Vector3(),
+      basis: new THREE.Matrix4(),
+      extra: new THREE.Quaternion(),
+      euler: new THREE.Euler(),
+    }),
+    [],
+  );
   const parallax = useRef({ x: 0, y: 0 });
-  // The canvas sits behind the page, so listen on window rather than via R3F events
   const pointer = useRef({ x: 0, y: 0 });
   useEffect(() => {
     const move = (e: PointerEvent) => {
@@ -31,63 +68,80 @@ function CameraRig() {
   }, []);
 
   useFrame(({ camera, size }, dt) => {
-    // Pointer parallax, critically damped so it never feels twitchy
     parallax.current.x = THREE.MathUtils.damp(parallax.current.x, pointer.current.x, 2.5, dt);
     parallax.current.y = THREE.MathUtils.damp(parallax.current.y, pointer.current.y, 2.5, dt);
+    const { cam, look, intro } = story;
+    orbitFrame(story.orbitU, v.pos, v.fwd, v.up, v.right);
 
-    const { camera: c, target: t, intro } = story;
+    // Station: fly along the velocity vector, "up" away from Earth, plus a staging rotation
+    if (station.current) {
+      station.current.position.copy(v.pos);
+      v.basis.makeBasis(v.right, v.up, v.fwd.clone().negate());
+      station.current.quaternion.setFromRotationMatrix(v.basis);
+      v.extra.setFromEuler(v.euler.set(story.sat.pitch, story.sat.yaw, story.sat.roll));
+      station.current.quaternion.multiply(v.extra);
+    }
 
-    // Shots are composed for landscape. On narrow screens, pull back and
-    // recentre on the spacecraft so it stays in frame.
+    // Narrow screens: pull back and centre the station
     const narrow = THREE.MathUtils.clamp((1.6 - size.width / size.height) / 1.1, 0, 1);
-    const pull = 1 + narrow * 1.1;
-    const tx = THREE.MathUtils.lerp(t.x, t.x * 0.15, narrow);
+    const pull = 1 + narrow * 0.9 + intro * 6;
+    const side = THREE.MathUtils.lerp(cam.side, cam.side * 0.2, narrow);
+    const lookSide = THREE.MathUtils.lerp(look.side, 0, narrow);
 
-    look.set(tx, t.y - intro * 1.5, t.z);
-    camera.position.set(
-      tx + (c.x - t.x) * pull + parallax.current.x * 0.45,
-      t.y + (c.y - t.y) * pull + parallax.current.y * 0.3 + intro * 4,
-      t.z + (c.z - t.z) * pull + intro * 16,
-    );
-    camera.lookAt(look);
+    v.cam
+      .copy(v.pos)
+      .addScaledVector(v.fwd, -cam.back * pull)
+      .addScaledVector(v.up, cam.up * (1 + intro * 2) + parallax.current.y * 0.03)
+      .addScaledVector(v.right, side * pull + parallax.current.x * 0.05);
+    v.look
+      .copy(v.pos)
+      .addScaledVector(v.fwd, look.ahead)
+      .addScaledVector(v.up, look.up)
+      .addScaledVector(v.right, lookSide);
+
+    // Blend toward the wide planetary shot
+    const g = story.global;
+    v.gl.copy(GLOBAL_CAM).applyAxisAngle(new THREE.Vector3(0, 1, 0), parallax.current.x * 0.05);
+    camera.position.lerpVectors(v.cam, v.gl, g);
+    v.look.lerp(new THREE.Vector3(0, 0, 0), g);
+    camera.up.copy(v.up).lerp(new THREE.Vector3(0, 1, 0), g).normalize();
+    camera.lookAt(v.look);
+
+    // Frame the subject beside the copy: shift the image instead of aiming off-centre,
+    // so perspective stays natural (on phones the copy sits below, so centre it)
+    const fx = story.frameX * (1 - narrow);
+    const persp = camera as THREE.PerspectiveCamera;
+    persp.setViewOffset(size.width, size.height, -fx * size.width, 0, size.width, size.height);
   });
   return null;
 }
 
-function StorySatellite() {
-  const ref = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const s = story.satellite;
-    ref.current.rotation.set(s.rx, s.ry + clock.elapsedTime * 0.012, s.rz);
-  });
-  return (
-    <group ref={ref}>
-      <Satellite size={5.2} hotspots />
-    </group>
-  );
-}
-
 export default function StoryScene() {
+  const earth = useRef<THREE.Group>(null);
+  const station = useRef<THREE.Group>(null);
+  const sun = useMemo(() => SUN.clone(), []);
+
   return (
     <div className="stage">
       <Canvas
+        shadows
         flat
         dpr={[1, 2]}
         gl={{ antialias: false, powerPreference: 'high-performance' }}
-        camera={{ fov: 32, near: 0.1, far: 2000, position: [0, 2, 30] }}
+        camera={{ fov: 32, near: 0.005, far: 4000, position: [0, 2, 30] }}
       >
-        <color attach="background" args={['#02040a']} />
-        <CameraRig />
+        <color attach="background" args={['#000000']} />
+        <Rig station={station} />
         <Suspense fallback={null}>
-          <SpaceLighting sun={SUN} />
-          <Starfield />
-          <group position={EARTH_POSITION} rotation-z={0.38}>
-            <Earth radius={EARTH_RADIUS} sun={SUN} spin={(t) => t * 0.006 + story.earthSpin} />
-            <RealConstellation earthRadius={EARTH_RADIUS} opacity={() => story.constellation} />
-          </group>
-          <StorySatellite />
-          <Effects />
+          <GlobeAtmosphere earth={earth} radius={EARTH_R} sun={sun} mode="fixed">
+            <SpaceLighting sun={sun} directional={false} />
+            <Earth ref={earth} radius={EARTH_R} sun={sun} spin={(t) => t * 0.002} />
+            <RealConstellation earthRadius={EARTH_R} opacity={() => story.constellation} />
+            <group ref={station}>
+              <Satellite model="issHd" size={ISS_SIZE} hotspots float={false} sun={sun} shadows reflections />
+            </group>
+            <GlobeEffects bloom={0.55} />
+          </GlobeAtmosphere>
         </Suspense>
       </Canvas>
     </div>

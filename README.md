@@ -33,20 +33,33 @@ All free and open, no API keys. `scripts/fetch-data.mjs` runs in GitHub Actions 
 | Upcoming and recent launches | [Launch Library 2](https://thespacedevs.com/llapi) by The Space Devs |
 | Kp index, Kp forecast, OVATION aurora forecast | [NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov) |
 | Natural events | [NASA EONET](https://eonet.gsfc.nasa.gov) |
+| Earth imagery, city lights, elevation | NASA Blue Marble NG, Black Marble, GEBCO (via NASA Visible Earth) |
+| Live clouds | [Live Cloud Maps](https://github.com/matteason/live-cloud-maps) (CC0; contains modified EUMETSAT data) |
 | City search (in the browser) | [Open-Meteo geocoding](https://open-meteo.com/en/docs/geocoding-api) |
 
 Positions are computed live in the browser with [satellite.js](https://github.com/shashwatak/satellite-js) (SGP4). A Web Worker propagates the whole catalog once a second, sending positions and velocities, and the GPU extrapolates between updates, so 16k points move smoothly with no per-frame CPU work.
 
+## Rendering
+
+- **Atmosphere:** [@takram/three-atmosphere](https://github.com/takram-design-engineering/three-geospatial) (Bruneton precomputed scattering) draws the physical sky, real stars and light extinction. The Earth shader adds view-dependent Rayleigh haze, a terminator glow, relief lighting from elevation, cloud shadows and ocean glint.
+- **Earth textures:** built in CI (`scripts/fetch-earth-textures.mjs`). NASA Blue Marble NG for the current month (8K), Black Marble city lights, a relief normal map computed from GEBCO elevation, and **live cloud cover refreshed every 3 hours** (Live Cloud Maps by Matt Eason; contains modified EUMETSAT data). The 2K set paints first and the 8K set streams in on capable desktops. Up close, procedural detail sharpens cloud edges and billows.
+- **Maps:** d3-geo with Natural Earth data. Equal Earth projection for events and launch sites, and polar orthographic views for the aurora, each with the live night side shaded.
+
 ## 3D models
 
-The ISS, Hubble and Landsat 8 models come from [NASA 3D Resources](https://github.com/nasa/NASA-3D-Resources). `scripts/prepare-models.sh` runs the full pipeline:
+From [NASA 3D Resources](https://github.com/nasa/NASA-3D-Resources). The ISS is NASA's high-detail engineering model (5.7M vertices, 220 textures) reduced for the web in Blender:
 
-1. **Decode** NASA's Draco compression (`scripts/models/undraco.mjs`).
-2. **Bake ambient occlusion in Blender** (`scripts/blender/bake_ao.py`). Cycles ray-traces contact shadows into vertex colours, so crevices between instruments and struts get real depth.
-3. **Tune AO strength** (`scripts/models/ao-strength.mjs`) so stacked parts read as shadow, not black.
-4. **Optimise** with glTF-Transform: meshopt geometry, WebP textures.
+1. `scripts/models/undraco.mjs` decodes Draco (the pip build of Blender lacks it).
+2. `scripts/blender/decimate.py` uses Blender's edge-collapse Decimate (2.7M → 295K faces), which keeps UV and normal seams intact where glTF simplifiers stall.
+3. `scripts/blender/bake_ao.py` bakes ray-traced ambient occlusion into vertex colours with Cycles. `scripts/models/ao-strength.mjs` tunes its strength.
+4. glTF-Transform: 1K WebP textures and meshopt geometry (15 MB).
 
-At runtime, `src/lib/materials.ts` upgrades NASA's flat materials by name to PBR: bump-mapped gold foil, clear-coated solar cells, emissive thrusters.
+`scripts/blender/enhance.py` adds a hard-surface bevel + weighted-normal pass and renders a Cycles preview for review. `scripts/prepare-models.sh` runs the pipeline for simpler models.
+
+At runtime the station gets:
+- solar wings that rotate on their masts to face the Sun, like the real beta gimbals
+- a shadow-casting sun light fitted to the craft
+- live reflections of Earth from a cube camera at its position
 
 ## Run it
 

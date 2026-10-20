@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { asset } from '@/lib/asset';
+import { WorldMap, type MapMarker } from '@/components/maps/WorldMap';
 import { ago, useData } from '@/lib/data';
 
 export interface Launch {
@@ -143,7 +143,12 @@ export function LaunchesApp() {
       )}
 
       <section className="launch-map-wrap" aria-label="Launch sites">
-        <LaunchMap launches={upcoming} hover={hover} onHover={setHover} />
+        <WorldMap
+          label="Map of upcoming launch sites"
+          markers={siteMarkers(upcoming)}
+          active={hover ? siteKeyFor(upcoming, hover) : null}
+          onActive={(key) => setHover(key ? upcoming.find((l) => siteKey(l) === key)?.id ?? null : null)}
+        />
       </section>
 
       <section aria-labelledby="upcoming">
@@ -213,39 +218,29 @@ function LaunchRow({ l, now, active, onHover, past = false }: { l: Launch; now: 
   );
 }
 
-const W = 720;
-const H = 360;
-const xy = (lat: number, lon: number) => [((lon + 180) / 360) * W, ((90 - lat) / 180) * H] as const;
+const siteKey = (l: Launch) => (l.lat == null || l.lon == null ? null : `${l.lat.toFixed(1)},${l.lon.toFixed(1)}`);
+const siteKeyFor = (launches: Launch[], id: string) => {
+  const l = launches.find((x) => x.id === id);
+  return l ? siteKey(l) : null;
+};
 
-function LaunchMap({ launches, hover, onHover }: { launches: Launch[]; hover: string | null; onHover: (id: string | null) => void }) {
-  // Several launches often share a pad: draw one marker per site, sized by count
-  const sites = useMemo(() => {
-    const m = new Map<string, { lat: number; lon: number; name: string; ids: string[] }>();
-    for (const l of launches) {
-      if (l.lat == null || l.lon == null) continue;
-      const key = `${l.lat.toFixed(1)},${l.lon.toFixed(1)}`;
-      const s = m.get(key) ?? { lat: l.lat, lon: l.lon, name: l.location ?? l.pad ?? '', ids: [] };
-      s.ids.push(l.id);
-      m.set(key, s);
-    }
-    return [...m.values()];
-  }, [launches]);
-
-  return (
-    <svg className="world-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Map of upcoming launch sites">
-      <image href={asset('/textures/earth_map_640.jpg')} width={W} height={H} opacity={0.42} style={{ filter: 'grayscale(1) contrast(1.15)' }} />
-      {sites.map((s) => {
-        const [x, y] = xy(s.lat, s.lon);
-        const on = hover !== null && s.ids.includes(hover);
-        return (
-          <g key={`${s.lat},${s.lon}`} transform={`translate(${x},${y})`} onMouseEnter={() => onHover(s.ids[0])} onMouseLeave={() => onHover(null)} style={{ cursor: 'default' }}>
-            <circle r={10} fill="transparent" />
-            <circle r={3 + Math.min(4, s.ids.length)} fill="none" stroke={on ? '#ffffff' : '#9fdcff'} strokeWidth={on ? 2 : 1} />
-            <circle r={2} fill={on ? '#ffffff' : '#9fdcff'} />
-            <title>{`${s.name}: ${s.ids.length} upcoming`}</title>
-          </g>
-        );
-      })}
-    </svg>
-  );
+/** One marker per launch site, sized by how many launches are queued there. */
+function siteMarkers(launches: Launch[]): MapMarker[] {
+  const sites = new Map<string, { l: Launch; n: number }>();
+  for (const l of launches) {
+    const key = siteKey(l);
+    if (!key) continue;
+    const s = sites.get(key);
+    if (s) s.n++;
+    else sites.set(key, { l, n: 1 });
+  }
+  return [...sites.entries()].map(([key, { l, n }]) => ({
+    id: key,
+    lat: l.lat!,
+    lon: l.lon!,
+    color: '#9fdcff',
+    r: 3 + Math.min(5, n),
+    title: l.location ?? l.pad ?? 'Launch site',
+    detail: `${n} upcoming · next: ${l.mission ?? l.name}`,
+  }));
 }

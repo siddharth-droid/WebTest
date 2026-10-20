@@ -4,63 +4,73 @@
  * GSAP ScrollTrigger tweens these plain numbers as the user scrolls; the R3F
  * scene reads them every frame in useFrame. Nothing here is React state, so
  * scrolling never triggers a re-render.
+ *
+ * The camera is expressed in the station's own frame (forward = direction of
+ * travel, up = away from Earth, side = to the right), so "follow the ISS
+ * along its orbit" is just animating `orbitU` while the offsets stay put.
  */
-export interface Vec {
-  x: number;
-  y: number;
-  z: number;
+export interface Frame {
+  /** Behind (−forward), above (+up), right (+side), in scene units. */
+  back: number;
+  up: number;
+  side: number;
 }
 
 export const story = {
-  camera: { x: -3.6, y: 0.9, z: 17 } as Vec,
-  target: { x: -4.2, y: -1.2, z: 0 } as Vec,
-  satellite: { rx: 0.3, ry: -2.2, rz: 0.2 },
-  earthSpin: 0,
+  /** Position along the orbit, radians. */
+  orbitU: 0.5,
+  cam: { back: 0.46, up: 0.1, side: -0.2 } as Frame,
+  /** Look target relative to the station: ahead, up, side. */
+  look: { ahead: 0, up: -0.02, side: -0.04 },
+  /** 0: camera rides with the station. 1: wide shot of the whole planet. */
+  global: 0,
+  /** Extra model rotation in the station frame (yaw, pitch, roll), radians. */
+  sat: { yaw: 0.35, pitch: 0, roll: 0 },
   constellation: 0,
+  /** Horizontal framing: shifts the image so the subject sits beside the copy (−0.5…0.5 of width). */
+  frameX: 0.27,
   intro: 1,
-  labels: { array: 0, instrument: 0, propulsion: 0 },
+  labels: { a: 0, b: 0, c: 0 },
 };
 
 export type HotspotKey = keyof typeof story.labels;
 
-/** One entry per scroll chapter. `camera`/`target`/`satellite` are where the chapter lands. */
-export const CHAPTERS = [
+type Chapter = {
+  id: string;
+  label: string;
+  orbitU?: number;
+  cam?: Frame;
+  look?: { ahead: number; up: number; side: number };
+  sat?: { yaw: number; pitch: number; roll: number };
+  global?: number;
+  constellation?: number;
+  frameX?: number;
+  labels?: Partial<Record<HotspotKey, number>>;
+};
+
+/** One entry per scroll chapter: where each chapter lands. */
+export const CHAPTERS: Chapter[] = [
+  { id: 'orbit', label: 'Orbit' },
   {
-    id: 'orbit',
-    label: 'Orbit',
+    id: 'station',
+    label: 'The ISS',
+    orbitU: 0.62,
+    cam: { back: 0.24, up: 0.09, side: 0.22 },
+    look: { ahead: 0, up: 0.0, side: 0.04 },
+    sat: { yaw: -0.35, pitch: 0.05, roll: 0 },
+    frameX: 0.2,
+    labels: { a: 1, b: 1, c: 1 },
   },
   {
-    id: 'power',
-    label: 'Landsat 8',
-    camera: { x: 1.6, y: 1.8, z: 7.5 },
-    target: { x: -0.4, y: -1.0, z: -1 },
-    satellite: { rx: 0.15, ry: -2.0, rz: 0.1 },
-    labels: { array: 1 },
+    id: 'sunrise',
+    label: '16 sunrises',
+    orbitU: 1.95,
+    cam: { back: 0.42, up: 0.09, side: -0.04 },
+    // The horizon sits ~20° below level from this altitude: aim at it
+    look: { ahead: 1.6, up: -0.64, side: 0 },
+    sat: { yaw: 0, pitch: 0, roll: 0 },
+    frameX: -0.2,
   },
-  {
-    id: 'compute',
-    label: 'Instruments',
-    camera: { x: -0.4, y: 0.6, z: 4.4 },
-    target: { x: -1.0, y: 0.0, z: 0 },
-    satellite: { rx: 0.05, ry: -2.7, rz: 0.0 },
-    labels: { instrument: 1, propulsion: 1 },
-  },
-  {
-    id: 'network',
-    label: 'Everything',
-    camera: { x: 10, y: 20, z: 42 },
-    target: { x: 5, y: -12, z: -10 },
-    satellite: { rx: 0.4, ry: -1.4, rz: 0.1 },
-    earthSpin: 1.1,
-    constellation: 1,
-  },
-  {
-    id: 'launch',
-    label: 'Explore',
-    camera: { x: 0, y: 1.8, z: 15 },
-    target: { x: 0, y: -1.6, z: 0 },
-    satellite: { rx: 0.25, ry: -2.4, rz: 0.15 },
-    earthSpin: 1.8,
-    constellation: 0.25,
-  },
-] as const;
+  { id: 'everything', label: 'Everything', orbitU: 2.3, global: 1, constellation: 1, frameX: -0.2 },
+  { id: 'explore', label: 'Explore', orbitU: 2.5, global: 0.82, constellation: 0.35, frameX: 0.16 },
+];

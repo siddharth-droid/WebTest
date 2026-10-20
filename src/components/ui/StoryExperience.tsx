@@ -54,19 +54,14 @@ export function StoryExperience() {
       CHAPTERS.forEach((chapter, i) => {
         if (i === 0) return;
         const at = i - 1;
-        if ('camera' in chapter) tl.to(story.camera, { ...chapter.camera }, at);
-        if ('target' in chapter) tl.to(story.target, { ...chapter.target }, at);
-        if ('satellite' in chapter) tl.to(story.satellite, { ...chapter.satellite }, at);
-        tl.to(
-          story,
-          {
-            earthSpin: 'earthSpin' in chapter ? chapter.earthSpin : story.earthSpin,
-            constellation: 'constellation' in chapter ? chapter.constellation : 0,
-          },
-          at,
-        );
+        if (chapter.cam) tl.to(story.cam, { ...chapter.cam }, at);
+        if (chapter.look) tl.to(story.look, { ...chapter.look }, at);
+        if (chapter.sat) tl.to(story.sat, { ...chapter.sat }, at);
+        // Travel along the orbit at a steady pace: this is what makes the camera "fly with" the station
+        if (chapter.orbitU !== undefined) tl.to(story, { orbitU: chapter.orbitU, ease: 'none' }, at);
+        tl.to(story, { global: chapter.global ?? 0, constellation: chapter.constellation ?? 0, frameX: chapter.frameX ?? 0 }, at);
         // Hotspots fade in as the camera settles and out as the next move starts
-        if ('labels' in chapter) {
+        if (chapter.labels) {
           const off = Object.fromEntries(Object.keys(chapter.labels).map((k) => [k, 0]));
           tl.to(story.labels, { ...chapter.labels, duration: 0.22, ease: 'power1.out' }, at + 0.72);
           tl.to(story.labels, { ...off, duration: 0.18, ease: 'power1.in' }, at + 1.02);
@@ -130,8 +125,8 @@ export function StoryExperience() {
       <div ref={root} className="story" style={{ visibility: ready ? 'visible' : 'hidden' }}>
         <section className="chapter hero">
           <h1 className="hero-title">
-            <span className="line"><span>Every satellite.</span></span>
-            <span className="line"><span>Right now.</span></span>
+            <span className="line"><span>Every satellite<span className="punct">.</span></span></span>
+            <span className="line"><span>Right now<span className="punct">.</span></span></span>
           </h1>
           <div className="hero-foot">
             <p>
@@ -142,32 +137,32 @@ export function StoryExperience() {
           </div>
         </section>
 
-        <section className="chapter" data-align="right">
+        <section className="chapter" data-align="left">
           <div className="chapter-copy" data-reveal>
-            <div className="chapter-meta mono"><b>02</b><span>Landsat 8</span></div>
-            <h2>One spacecraft, the whole planet.</h2>
+            <div className="chapter-meta mono"><b>02</b><span>International Space Station</span></div>
+            <h2>A football field, 420 km up.</h2>
             <p>
-              Landsat 8 has photographed every point on Earth&rsquo;s land every 16 days since 2013, crossing the equator at
-              the same local time on each orbit so shadows always fall the same way.
+              Sixteen pressurised modules from five space agencies, continuously crewed since November 2000. This is
+              NASA&rsquo;s own engineering model, down to the handrails.
             </p>
             <dl className="spec">
-              <div><dt className="mono">Altitude</dt><dd className="tabular">705 km</dd></div>
-              <div><dt className="mono">Repeat cycle</dt><dd className="tabular">16 days</dd></div>
+              <div><dt className="mono">Span</dt><dd className="tabular">109 m</dd></div>
+              <div><dt className="mono">Mass</dt><dd className="tabular">420 t</dd></div>
             </dl>
           </div>
         </section>
 
-        <section className="chapter" data-align="left">
+        <section className="chapter" data-align="right">
           <div className="chapter-copy" data-reveal>
-            <div className="chapter-meta mono"><b>03</b><span>Instruments</span></div>
-            <h2>Seeing in light we can&rsquo;t.</h2>
+            <div className="chapter-meta mono"><b>03</b><span>Orbit</span></div>
+            <h2>Sixteen sunrises a day.</h2>
             <p>
-              Two imagers share the instrument deck: one for visible and infrared light, one for heat. Together they map
-              crops, glaciers, wildfire scars and city growth.
+              At 7.66 km per second the station laps the planet every 92 minutes, so the crew sees a sunrise or a
+              sunset every 45. Scroll to ride along.
             </p>
             <dl className="spec">
-              <div><dt className="mono">Swath</dt><dd className="tabular">185 km</dd></div>
-              <div><dt className="mono">Imagers</dt><dd className="tabular">OLI + TIRS</dd></div>
+              <div><dt className="mono">Speed</dt><dd className="tabular">27,600 km/h</dd></div>
+              <div><dt className="mono">One orbit</dt><dd className="tabular">92 min</dd></div>
             </dl>
           </div>
         </section>

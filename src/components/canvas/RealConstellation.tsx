@@ -7,6 +7,7 @@ import { propagate } from 'satellite.js';
 import { loadData } from '@/lib/data';
 import { parseCatalog, satrecFor, type SatelliteFile } from '@/lib/sat/catalog';
 import { groupOf } from '@/lib/sat/groups';
+import { RADIANCE } from '@/components/globe/units';
 
 /**
  * Every tracked satellite where it is at the moment the page loads, as a
@@ -56,7 +57,7 @@ async function build(earthRadius: number) {
     if (!pv) continue;
     const s = earthRadius / 6371;
     pos.push(pv.position.x * s, pv.position.z * s, -pv.position.y * s);
-    c.set(groupOf(sat.category).color);
+    c.set(groupOf(sat.category).color).multiplyScalar(RADIANCE * 1.6);
     col.push(c.r, c.g, c.b);
   }
   const g = new THREE.BufferGeometry();

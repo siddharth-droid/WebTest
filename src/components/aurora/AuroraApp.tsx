@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { asset } from '@/lib/asset';
+import { useMemo, useState } from 'react';
+import { PolarAurora } from '@/components/maps/PolarAurora';
 import { ago, useData } from '@/lib/data';
 import { useObserver } from '@/lib/observer';
 import { LocationControl } from '@/components/ui/LocationControl';
@@ -115,7 +115,16 @@ export function AuroraApp() {
             <h2 id="oval">Aurora probability right now</h2>
             <span className="mono muted">Forecast for {fmtTime(w.aurora.forecastTime)}</span>
           </div>
-          <AuroraMap grid={grid} observer={observer} />
+          <div className="polar-pair">
+            <PolarAurora grid={grid} hemisphere="north" observer={observer} />
+            <PolarAurora grid={grid} hemisphere="south" observer={observer} />
+          </div>
+          <div className="map-scale-row mono">
+            <span>Chance of aurora overhead</span>
+            <i className="aurora-ramp" />
+            <span>10% → 90%</span>
+            <span className="muted">Shaded: night side right now</span>
+          </div>
         </section>
       )}
 
@@ -222,43 +231,4 @@ function dayTicks(all: KpPoint[], bw: number) {
     ticks.push({ x, label: d.toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: 'UTC' }) });
   });
   return ticks;
-}
-
-function AuroraMap({ grid, observer }: { grid: Uint8Array; observer: { lat: number; lon: number } | null }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const c = canvas.current;
-    if (!c) return;
-    const ctx = c.getContext('2d')!;
-    const img = ctx.createImageData(360, 181);
-    for (let row = 0; row < 181; row++) {
-      for (let col = 0; col < 360; col++) {
-        // Canvas: north up, longitude −180 at the left
-        const lat = 90 - row;
-        const lon = col - 180;
-        const p = probAt(grid, lat, lon) / 100;
-        const o = (row * 360 + col) * 4;
-        img.data[o] = Math.round(60 + 195 * Math.max(0, p - 0.5) * 2);
-        img.data[o + 1] = 255;
-        img.data[o + 2] = Math.round(140 * (1 - p));
-        img.data[o + 3] = Math.round(255 * Math.min(1, p * 1.8));
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-  }, [grid]);
-
-  const obs = observer ? [((observer.lon + 180) / 360) * 100, ((90 - observer.lat) / 180) * 100] : null;
-  return (
-    <div className="aurora-map">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={asset('/textures/earth_map_640.jpg')} alt="" />
-      <canvas ref={canvas} width={360} height={181} aria-label="Aurora probability overlay" />
-      {obs && <span className="map-pin" style={{ left: `${obs[0]}%`, top: `${obs[1]}%` }} title="You" />}
-      <div className="map-scale mono">
-        <span>10%</span>
-        <i />
-        <span>90%</span>
-      </div>
-    </div>
-  );
 }

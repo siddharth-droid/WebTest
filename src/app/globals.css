@@ -59,6 +59,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   pointer-events: none;
 }
 .site-header > * { pointer-events: auto; }
+/* Keeps nav legible over content scrolling beneath it */
+.site-header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -24px 0;
+  z-index: -1;
+  background: linear-gradient(rgb(2 4 10 / 0.92), rgb(2 4 10 / 0.6) 55%, transparent);
+  pointer-events: none;
+}
 .wordmark {
   font-weight: 800;
   font-variation-settings: 'wdth' 125;
@@ -161,13 +170,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   grid-column: 1 / -1;
   font-weight: 860;
   font-variation-settings: 'wdth' 125;
-  font-size: clamp(30px, 7.6vw, 150px);
+  font-size: clamp(30px, 6.1vw, 124px);
   line-height: 0.84;
   letter-spacing: -0.035em;
   text-transform: uppercase;
 }
 .hero-title .line { display: block; overflow: hidden; padding-bottom: 0.04em; }
 .hero-title .line > span { display: inline-block; will-change: transform; }
+/* Tight display tracking pulls the full stop into the preceding letter; give it its own air */
+.hero-title .punct { display: inline-block; margin-left: 0.07em; letter-spacing: 0; }
 .hero-foot {
   grid-column: 1 / -1;
   display: grid;
@@ -236,6 +247,11 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   border-right: 1px solid var(--rule-strong);
   text-align: right;
 }
+
+/* Leaders that point downward, for labels that would otherwise stack */
+.hotspot[data-v='down'] .hotspot-leader { transform: rotate(32deg); }
+.hotspot[data-v='down'] .hotspot-copy { top: 20px; }
+.hotspot[data-side='left'][data-v='down'] .hotspot-leader { transform: rotate(-32deg); }
 
 /* Hotspots (drei <Html>) */
 .hotspot { position: relative; width: 0; height: 0; transition: none; }
@@ -686,3 +702,28 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .layer-toggles { display: none; }
   .page { gap: 40px; padding-top: 88px; }
 }
+
+/* ------------------------------------------------------------------ maps */
+.world-map-wrap { position: relative; }
+.world-map-svg { display: block; width: 100%; height: auto; }
+.map-tip {
+  position: absolute;
+  transform: translate(14px, -50%);
+  display: grid;
+  gap: 3px;
+  max-width: 280px;
+  padding: 8px 10px;
+  background: rgb(5 8 15 / 0.92);
+  border: 1px solid var(--rule-strong);
+  pointer-events: none;
+  font-size: 13px;
+}
+.map-tip strong { font-weight: 600; }
+.map-tip .mono { font-size: 10px; color: var(--fg-2); }
+.polar-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.polar { margin: 0; display: grid; gap: 10px; justify-items: center; }
+.polar-canvas { position: relative; width: 100%; max-width: 520px; }
+.polar figcaption { color: var(--fg-2); }
+.map-scale-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; color: var(--fg-2); font-size: 10px; }
+.aurora-ramp { width: 120px; height: 6px; background: linear-gradient(90deg, rgb(40 170 110 / 0.2), rgb(90 220 130), rgb(160 255 150)); }
+@media (max-width: 860px) { .polar-pair { grid-template-columns: 1fr; } }

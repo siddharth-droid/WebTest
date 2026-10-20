@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { asset } from '@/lib/asset';
+import { WorldMap } from '@/components/maps/WorldMap';
 import { ago, useData } from '@/lib/data';
 import { eventColor } from '@/lib/events';
 
@@ -21,9 +21,14 @@ interface EventsFile {
   events: EarthEvent[];
 }
 
-const W = 720;
-const H = 360;
-const xy = (lat: number, lon: number) => [((lon + 180) / 360) * W, ((90 - lat) / 180) * H] as const;
+/** Area ∝ magnitude within each kind of event, so a 130-knot typhoon outweighs a 30-knot storm. */
+function markerSize(e: EarthEvent) {
+  const v = parseFloat(e.magnitude ?? '');
+  if (!Number.isFinite(v)) return 4;
+  if (e.category === 'Severe Storms') return 3 + Math.sqrt(v / 160) * 8;
+  if (e.category === 'Wildfires') return 3 + Math.min(6, Math.sqrt(v / 2000) * 3);
+  return 3 + Math.min(6, Math.sqrt(v / 300) * 3);
+}
 const dateStr = (iso: string) => new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
 
 export function EarthApp() {
@@ -67,20 +72,20 @@ export function EarthApp() {
         ))}
       </div>
 
-      <svg className="world-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Map of active natural events">
-        <image href={asset('/textures/earth_map_640.jpg')} width={W} height={H} opacity={0.42} style={{ filter: 'grayscale(1) contrast(1.15)' }} />
-        {events.map((e) => {
-          const [x, y] = xy(e.lat, e.lon);
-          const on = hover === e.id;
-          return (
-            <g key={e.id} transform={`translate(${x},${y})`} onMouseEnter={() => setHover(e.id)} onMouseLeave={() => setHover(null)}>
-              <circle r={9} fill="transparent" />
-              <circle r={on ? 6 : 4} fill={eventColor(e.category)} stroke="#02040a" strokeWidth={2} />
-              <title>{e.title}</title>
-            </g>
-          );
-        })}
-      </svg>
+      <WorldMap
+        label="Map of active natural events"
+        markers={events.map((e) => ({
+          id: e.id,
+          lat: e.lat,
+          lon: e.lon,
+          color: eventColor(e.category),
+          r: markerSize(e),
+          title: e.title,
+          detail: [e.category, dateStr(e.date), e.magnitude].filter(Boolean).join(' · '),
+        }))}
+        active={hover}
+        onActive={setHover}
+      />
 
       <ol className="event-list">
         {events.map((e) => (

@@ -47,6 +47,19 @@ const keepColor = (src: THREE.MeshStandardMaterial) => src.color.clone();
  */
 const UPGRADES: [RegExp, Upgrade][] = [
   [
+    // ISS arrays look amber-gold from the front: copper-coloured cells under glass
+    /^ISSSolarPanels$/,
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: '#7a4a1e',
+        metalness: 0.55,
+        roughness: 0.32,
+        clearcoat: 0.7,
+        clearcoatRoughness: 0.15,
+        side: THREE.DoubleSide,
+      }),
+  ],
+  [
     /solarpanel-(face|\d)|SolarPanels/i,
     (src) =>
       new THREE.MeshPhysicalMaterial({
@@ -98,6 +111,8 @@ const UPGRADES: [RegExp, Upgrade][] = [
 
 export function upgradeMaterial(src: THREE.Material): THREE.Material {
   if (!(src instanceof THREE.MeshStandardMaterial)) return src;
+  // Textured materials were authored by NASA's artists (e.g. the HD ISS): leave them as they are
+  if (src.map || src.normalMap || src.metalnessMap) return src;
   const match = UPGRADES.find(([re]) => re.test(src.name));
   if (!match) {
     // Unknown part: keep everything the artist set (including textures), just less plastic

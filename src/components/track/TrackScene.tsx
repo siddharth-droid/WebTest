@@ -8,17 +8,20 @@ import * as THREE from 'three';
 import { propagate } from 'satellite.js';
 import { Earth } from '@/components/canvas/Earth';
 import { Satellite, type ModelId } from '@/components/canvas/Satellite';
-import { Starfield } from '@/components/canvas/Starfield';
-import { Effects } from '@/components/canvas/Effects';
+import { GlobeAtmosphere, GlobeEffects } from '@/components/globe/Globe';
+import { RADIANCE } from '@/components/globe/units';
 import { eventColor } from '@/lib/events';
 import { earthRotation, eciToScene, latLonToScene, sunDirection } from '@/lib/sat/astro';
+
+/** Overlay colours are authored for display; scale them into the scene's radiance range. */
+const glow = (hex: string, k = 1.4) => new THREE.Color(hex).multiplyScalar(RADIANCE * k);
 import { satrecFor, type Catalog, type SatelliteRecord } from '@/lib/sat/catalog';
 import type { Observer } from '@/lib/sat/passes';
 import { SatelliteCloud } from './SatelliteCloud';
 import type { LiveSnapshot } from './useLiveCatalog';
 
 /** Real 3D models for satellites NASA has published one for. */
-const MODEL_FOR: Record<number, ModelId> = { 25544: 'iss', 20580: 'hubble', 39084: 'landsat8' };
+const MODEL_FOR: Record<number, ModelId> = { 25544: 'issHd', 20580: 'hubble', 39084: 'landsat8' };
 const OVERVIEW_DISTANCE = 3.4;
 const FOLLOW_DISTANCE = 0.09;
 
@@ -58,14 +61,12 @@ function satPosition(sat: SatelliteRecord, date: Date, out: THREE.Vector3) {
   return eciToScene(pv.position.x, pv.position.y, pv.position.z, out);
 }
 
-function TrackLighting({ sun }: { sun: THREE.Vector3 }) {
-  const light = useRef<THREE.DirectionalLight>(null);
-  useFrame(() => light.current?.position.copy(sun).multiplyScalar(40));
+/** Fill light and reflections for models; each model brings its own sun light (see Satellite). */
+function TrackLighting() {
   return (
     <>
-      <directionalLight ref={light} intensity={4} color="#fff3e2" />
-      <hemisphereLight args={['#05070d', '#1e4f9c', 0.4]} />
-      <Environment resolution={128} frames={1} environmentIntensity={0.7}>
+      <hemisphereLight args={['#05070d', '#1e4f9c', 0.6 * RADIANCE]} />
+      <Environment resolution={128} frames={1} environmentIntensity={0.8 * RADIANCE}>
         <Lightformer form="rect" intensity={2} color="#fff1dc" position={[10, 4, 6]} scale={[4, 4, 1]} target={[0, 0, 0]} />
         <Lightformer form="rect" intensity={0.6} color="#4a6c9e" position={[0, -10, 0]} rotation-x={Math.PI / 2} scale={[40, 40, 1]} />
       </Environment>
@@ -116,7 +117,7 @@ function FollowRig({ selected }: { selected: SatelliteRecord | null }) {
   return null;
 }
 
-function SelectedSatellite({ sat, showOrbit }: { sat: SatelliteRecord; showOrbit: boolean }) {
+function SelectedSatellite({ sat, showOrbit, sun }: { sat: SatelliteRecord; showOrbit: boolean; sun: THREE.Vector3 }) {
   const group = useRef<THREE.Group>(null);
   const p = useMemo(() => new THREE.Vector3(), []);
   const ahead = useMemo(() => new THREE.Vector3(), []);
@@ -132,7 +133,7 @@ function SelectedSatellite({ sat, showOrbit }: { sat: SatelliteRecord; showOrbit
       if (q) pts.push(q);
     }
     const g = new THREE.BufferGeometry().setFromPoints(pts);
-    return new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#e8edf5', transparent: true, opacity: 0.35, depthWrite: false }));
+    return new THREE.Line(g, new THREE.LineBasicMaterial({ color: glow('#e8edf5'), transparent: true, opacity: 0.5, depthWrite: false }));
   }, [sat]);
 
   useEffect(() => () => orbit.geometry.dispose(), [orbit]);
@@ -152,7 +153,8 @@ function SelectedSatellite({ sat, showOrbit }: { sat: SatelliteRecord; showOrbit
       <group ref={group}>
         {model && (
           <Suspense fallback={null}>
-            <Satellite model={model} size={0.02} float={false} />
+            {/* Drawn ~150× life size so it is visible at follow distance */}
+            <Satellite model={model} size={0.016} float={false} sun={sun} shadows reflections />
           </Suspense>
         )}
         <Html zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
@@ -169,7 +171,7 @@ function ObserverPin({ observer }: { observer: Observer }) {
     <group position={pos}>
       <mesh>
         <sphereGeometry args={[0.008, 16, 16]} />
-        <meshBasicMaterial color="#ffffff" toneMapped={false} />
+        <meshBasicMaterial color={glow('#ffffff', 2)} />
       </mesh>
       <Html zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
         <div className="observer-tag mono">{observer.label ?? 'You'}</div>
@@ -207,7 +209,7 @@ function AuroraLayer({ aurora }: { aurora: AuroraGrid }) {
   return (
     <mesh scale={1.01}>
       <sphereGeometry args={[1, 128, 64]} />
-      <meshBasicMaterial map={texture} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      <meshBasicMaterial map={texture} color={glow('#ffffff', 1.6)} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
     </mesh>
   );
 }
@@ -219,7 +221,7 @@ function EventMarkers({ events }: { events: EarthEvent[] }) {
       {events.map((e) => (
         <mesh key={e.id} position={latLonToScene(e.lat, e.lon, 1.003)}>
           <sphereGeometry args={[0.006, 10, 10]} />
-          <meshBasicMaterial color={eventColor(e.category)} toneMapped={false} />
+          <meshBasicMaterial color={glow(eventColor(e.category), 2)} />
         </mesh>
       ))}
     </>
@@ -229,10 +231,12 @@ function EventMarkers({ events }: { events: EarthEvent[] }) {
 export default function TrackScene(props: TrackSceneProps) {
   const { catalog, live, visibleCategories, selected, hovered, onSelect, onHover, onDeselect, observer, aurora, events, showOrbit } = props;
   const sun = useMemo(() => sunDirection(new Date()), []);
+  const earth = useRef<THREE.Group>(null);
 
   return (
     <div className="stage">
       <Canvas
+        shadows
         flat
         dpr={[1, 2]}
         gl={{ antialias: false }}
@@ -241,14 +245,13 @@ export default function TrackScene(props: TrackSceneProps) {
         onPointerMissed={onDeselect}
         style={{ cursor: hovered !== null ? 'pointer' : 'grab' }}
       >
-        <color attach="background" args={['#02040a']} />
-        <SunTracker sun={sun} />
+        <color attach="background" args={['#000000']} />
         <OrbitControls makeDefault enablePan={false} enableDamping dampingFactor={0.08} rotateSpeed={0.45} minDistance={selected ? 0.02 : 1.15} maxDistance={40} />
         <FollowRig selected={selected} />
         <Suspense fallback={null}>
-          <TrackLighting sun={sun} />
-          <Starfield />
-          <Earth radius={1} sun={sun} spin={() => earthRotation(new Date())}>
+          <GlobeAtmosphere earth={earth} radius={1} sun={sun} mode="real">
+          <TrackLighting />
+          <Earth ref={earth} radius={1} sun={sun} spin={() => earthRotation(new Date())}>
             {observer && <ObserverPin observer={observer} />}
             {aurora && <AuroraLayer aurora={aurora} />}
             {events && <EventMarkers events={events} />}
@@ -262,22 +265,11 @@ export default function TrackScene(props: TrackSceneProps) {
             onSelect={onSelect}
             onHover={onHover}
           />
-          {selected && <SelectedSatellite sat={selected} showOrbit={showOrbit} />}
-          <Effects bloom={0.55} />
+          {selected && <SelectedSatellite sat={selected} showOrbit={showOrbit} sun={sun} />}
+          <GlobeEffects bloom={0.5} />
+          </GlobeAtmosphere>
         </Suspense>
       </Canvas>
     </div>
   );
-}
-
-/** Keeps the shared sun vector pointing at the real Sun. */
-function SunTracker({ sun }: { sun: THREE.Vector3 }) {
-  const last = useRef(0);
-  useFrame(() => {
-    const t = Date.now();
-    if (t - last.current < 5_000) return;
-    last.current = t;
-    sunDirection(new Date(t), sun);
-  });
-  return null;
 }

@@ -1,18 +1,32 @@
-// Earth surface + atmosphere shaders.
+// Earth surface shader.
 //
-// Textures (NASA Blue Marble / Black Marble, via the three.js examples):
-//   uDay   – daytime albedo
-//   uNight – city lights
-//   uBRC   – packed: R = bump, G = roughness (oceans are smooth), B = clouds
+// Outputs physical-ish radiance for a scene lit by the real Sun; the
+// atmosphere (limb glow, haze, twilight) is added on top by
+// @takram/three-atmosphere's Sky and AerialPerspective passes.
+//
+//   uDay     NASA Blue Marble NG (monthly) albedo
+//   uNight   NASA Black Marble city lights
+//   uClouds  live global cloud cover (greyscale)
+//   uRelief  tangent-space normal map from GEBCO elevation
+//   uWater   roughness map (G): oceans are smooth, land is rough
 
 export const surfaceVertex = /* glsl */ `
 varying vec2 vUv;
-varying vec3 vNormalW;
 varying vec3 vWorld;
+varying vec3 vNormalW;
+varying vec3 vEastW;
+varying vec3 vNorthW;
 
 void main() {
   vUv = uv;
-  vNormalW = normalize(mat3(modelMatrix) * normal);
+  // Tangent frame on the sphere (east, north), built in local space then rotated to world
+  vec3 n = normalize(position);
+  vec3 east = normalize(vec3(n.z, 0.0, -n.x) + vec3(1e-5, 0.0, 0.0));
+  vec3 north = cross(n, east);
+  mat3 m = mat3(modelMatrix);
+  vNormalW = normalize(m * n);
+  vEastW = normalize(m * east);
+  vNorthW = normalize(m * north);
   vec4 world = modelMatrix * vec4(position, 1.0);
   vWorld = world.xyz;
   gl_Position = projectionMatrix * viewMatrix * world;
@@ -22,58 +36,136 @@ void main() {
 export const surfaceFragment = /* glsl */ `
 uniform sampler2D uDay;
 uniform sampler2D uNight;
-uniform sampler2D uBRC;
-uniform vec3 uSun;
+uniform sampler2D uClouds;
+uniform sampler2D uRelief;
+uniform sampler2D uWater;
+uniform float uHasRelief;
+uniform float uCloudsChannel; // 0: greyscale map (R), 1: packed legacy map (B)
+uniform vec3 uSun;            // world space, normalised
+uniform float uIntensity;     // radiance scale to match the atmosphere's units
 uniform float uCloudOffset;
 
 varying vec2 vUv;
-varying vec3 vNormalW;
 varying vec3 vWorld;
+varying vec3 vNormalW;
+varying vec3 vEastW;
+varying vec3 vNorthW;
 
-const vec3 ATMO_DAY = vec3(0.3, 0.7, 1.0);
-const vec3 ATMO_TWILIGHT = vec3(0.74, 0.29, 0.04);
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float s = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 5; i++) {
+    s += a * vnoise(p);
+    p = p * 2.07 + vec2(17.1, 9.3);
+    a *= 0.5;
+  }
+  return s;
+}
+
+float cloudAt(vec2 uv) {
+  vec4 c = texture2D(uClouds, uv + vec2(uCloudOffset, 0.0));
+  float v = mix(c.r, c.b, uCloudsChannel);
+  // Thin haze in the source map would read as overcast everywhere; keep real cloud decks
+  return pow(smoothstep(0.38, 0.95, v), 1.35);
+}
 
 void main() {
   vec3 N = normalize(vNormalW);
+  vec3 east = normalize(vEastW);
+  vec3 north = normalize(vNorthW);
   vec3 V = normalize(cameraPosition - vWorld);
-  float sunFacing = dot(N, uSun);
+  vec3 L = uSun;
 
-  vec3 day = texture2D(uDay, vUv).rgb;
-  vec3 night = texture2D(uNight, vUv).rgb;
-  float roughness = texture2D(uBRC, vUv).g;
-  float clouds = smoothstep(0.2, 1.0, texture2D(uBRC, vUv + vec2(uCloudOffset, 0.0)).b);
+  // Relief: perturb the land normal so mountains catch low sunlight
+  vec3 NR = N;
+  if (uHasRelief > 0.5) {
+    vec3 t = texture2D(uRelief, vUv).xyz * 2.0 - 1.0;
+    NR = normalize(east * t.x + north * t.y + N * t.z);
+  }
 
-  // Daylight side: albedo under the sun, clouds on top
-  vec3 albedo = mix(day, vec3(1.0), clouds * 1.6);
-  float diffuse = max(sunFacing, 0.0);
-  vec3 lit = albedo * diffuse * 2.4;
+  vec3 albedo = texture2D(uDay, vUv).rgb;
+  float water = 1.0 - smoothstep(0.25, 0.6, texture2D(uWater, vUv).g);
+  // Seen from orbit, open ocean is a near-uniform deep navy, not a shaded seafloor map
+  float shelf = smoothstep(0.02, 0.09, dot(albedo, vec3(0.2126, 0.7152, 0.0722)));
+  albedo = mix(albedo, mix(vec3(0.006, 0.018, 0.045), albedo * 0.55, shelf * 0.35), water * 0.85);
+  float clouds = cloudAt(vUv);
+  // Up close the 8K cloud map is softer than a pixel; add procedural detail at cloud edges,
+  // fading in as the texture gets magnified on screen
+  float magnified = smoothstep(2.5e-4, 0.6e-4, fwidth(vUv.x));
+  if (magnified > 0.0) {
+    vec2 q = vUv * vec2(4096.0, 2048.0);
+    float detail = fbm(q) * 0.65 + fbm(q * 4.3) * 0.35;
+    float edge = clamp(clouds * (1.0 - clouds) * 4.0, 0.0, 1.0);
+    clouds = clamp(clouds + (detail - 0.5) * 0.9 * edge * magnified, 0.0, 1.0);
+    // Billows through the whole deck: brightness varies like the tops of real cumulus
+    float billow = fbm(q * 2.1 + 31.0);
+    clouds *= mix(1.0, 0.72 + 0.56 * billow, magnified * smoothstep(0.2, 0.7, clouds));
+  }
 
-  // Specular glint, only where the surface is smooth water and not cloud
-  vec3 H = normalize(uSun + V);
-  float gloss = (1.0 - roughness) * (1.0 - clouds);
-  lit += vec3(1.0, 0.86, 0.66) * pow(max(dot(N, H), 0.0), 220.0) * gloss * 0.9 * step(0.0, sunFacing);
+  // Cloud shadows: look up the cloud cover between this point and the Sun
+  vec2 sunTangent = vec2(dot(L, east), dot(L, north));
+  float shadow = cloudAt(vUv - sunTangent * vec2(0.0018, 0.0036));
 
-  // Night side: city lights, dimmed by cloud cover
-  vec3 dark = night * (1.0 - clouds * 0.8) * 1.8;
+  float NdL = dot(N, L);
+  float lambertGround = max(dot(NR, L), 0.0);
+  float lambertCloud = max(NdL, 0.0);
+  // Soft terminator: light wraps slightly as the atmosphere scatters it round
+  float daylight = smoothstep(-0.035, 0.06, NdL);
 
-  vec3 color = mix(dark, lit, smoothstep(-0.25, 0.5, sunFacing));
+  vec3 sunColor = mix(vec3(1.0, 0.62, 0.42), vec3(1.0, 0.97, 0.93), smoothstep(0.0, 0.07, NdL));
+  vec3 ground = albedo * lambertGround * (1.0 - 0.55 * shadow * (1.0 - clouds));
 
-  // Atmospheric scattering at grazing angles: blue by day, orange at the terminator
-  float fresnel = 1.0 - abs(dot(V, N));
-  vec3 atmoColor = mix(ATMO_TWILIGHT, ATMO_DAY, smoothstep(-0.05, 0.35, sunFacing));
-  float atmoMix = clamp(smoothstep(-0.1, 0.8, sunFacing) * pow(fresnel, 3.0), 0.0, 1.0);
-  color = mix(color, atmoColor * 1.2, atmoMix);
+  // Ocean: broad sun glitter plus Fresnel sky reflection
+  vec3 H = normalize(L + V);
+  float NdH = max(dot(N, H), 0.0);
+  float glint = pow(NdH, 140.0) * 2.4 + pow(NdH, 18.0) * 0.12;
+  float fresnel = pow(1.0 - max(dot(N, V), 0.0), 5.0);
+  ground += water * (1.0 - clouds) * (glint * sunColor + fresnel * vec3(0.10, 0.20, 0.38)) * lambertCloud;
 
+  vec3 cloudColor = vec3(0.84, 0.86, 0.9) * (lambertCloud * 0.95 + 0.03);
+  vec3 lit = mix(ground, cloudColor, clouds) * sunColor * daylight;
+
+  // City lights only where it is dark, dimmed by overcast skies
+  // Keep Black Marble's moonlit land as a faint base; only real city lights glow
+  vec3 nightTex = texture2D(uNight, vUv).rgb;
+  float lum = dot(nightTex, vec3(0.2126, 0.7152, 0.0722));
+  vec3 lights = vec3(1.0, 0.72, 0.42) * smoothstep(0.1, 0.75, lum) * 1.6 + nightTex * 0.04;
+  vec3 night = lights * (1.0 - smoothstep(-0.18, 0.05, NdL)) * (1.0 - clouds * 0.75) * 0.9;
+
+  // Sunlit surface in the atmosphere's units: albedo × solar irradiance / π (≈ 0.58 × albedo)
+  vec3 color = lit * 0.28;
+
+  // Rayleigh haze along the view ray: thin looking straight down, thick toward the limb,
+  // and only where the air itself is sunlit
+  float NdV = max(dot(N, V), 0.02);
+  float path = 1.0 / NdV - 1.0;
+  float haze = 1.0 - exp(-0.09 * path);
+  vec3 skyBlue = vec3(0.16, 0.36, 0.95) * 0.30;
+  vec3 twilight = vec3(0.95, 0.42, 0.22) * 0.05;
+  vec3 air = mix(twilight, skyBlue, smoothstep(-0.03, 0.05, NdL)) * smoothstep(-0.12, 0.06, NdL);
+  color = mix(color, air, haze * 0.8);
+
+  color += night * uIntensity;
   gl_FragColor = vec4(color, 1.0);
-  #include <tonemapping_fragment>
-  #include <colorspace_fragment>
 }
 `;
 
-export const atmosphereVertex = /* glsl */ `
+// Limb glow: back faces of a thin shell just above the surface. The glow
+// peaks exactly at the planet's silhouette and fades quickly into space.
+export const limbVertex = /* glsl */ `
 varying vec3 vNormalW;
 varying vec3 vWorld;
-
 void main() {
   vNormalW = normalize(mat3(modelMatrix) * normal);
   vec4 world = modelMatrix * vec4(position, 1.0);
@@ -82,29 +174,23 @@ void main() {
 }
 `;
 
-export const atmosphereFragment = /* glsl */ `
+export const limbFragment = /* glsl */ `
 uniform vec3 uSun;
-
+uniform float uIntensity;
+uniform float uThickness;
 varying vec3 vNormalW;
 varying vec3 vWorld;
-
-const vec3 ATMO_DAY = vec3(0.3, 0.7, 1.0);
-const vec3 ATMO_TWILIGHT = vec3(0.74, 0.29, 0.04);
-
 void main() {
-  // Drawn on the back faces of a slightly larger shell, so the glow peaks
-  // at the planet's silhouette and falls off into space.
   vec3 N = normalize(vNormalW);
   vec3 V = normalize(cameraPosition - vWorld);
   float sunFacing = dot(N, uSun);
-
-  float rim = clamp(1.0 + dot(V, N) * 1.12, 0.0, 1.0);
-  float glow = pow(rim, 4.0);
-  vec3 color = mix(ATMO_TWILIGHT, ATMO_DAY, smoothstep(-0.1, 0.3, sunFacing));
-  float daylight = smoothstep(-0.25, 0.5, sunFacing);
-
-  gl_FragColor = vec4(color * glow * daylight * 1.5, glow * daylight);
-  #include <tonemapping_fragment>
-  #include <colorspace_fragment>
+  // 0 at the centre of the disc, 1 at the silhouette of the shell
+  float rim = clamp(1.0 + dot(V, N) / uThickness, 0.0, 1.0);
+  float glow = pow(rim, 5.0) * 1.4 + pow(rim, 18.0) * 2.0;
+  vec3 day = vec3(0.32, 0.6, 1.0);
+  vec3 dusk = vec3(1.0, 0.48, 0.22);
+  vec3 color = mix(dusk, day, smoothstep(-0.16, 0.04, sunFacing));
+  float lit = smoothstep(-0.3, 0.25, sunFacing);
+  gl_FragColor = vec4(color * glow * lit * uIntensity, 1.0);
 }
 `;
