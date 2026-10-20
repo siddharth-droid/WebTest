@@ -23,7 +23,7 @@ npm run lint && npm run typecheck
 
 ## Deploy
 
-`.github/workflows/deploy-pages.yml` builds a static export and publishes it to GitHub Pages on every push. `NEXT_PUBLIC_BASE_PATH` sets the sub-path (`/WebTest`), and `src/lib/asset.ts` prefixes model and texture URLs with it.
+`.github/workflows/deploy-pages.yml` builds a static export on every push and publishes it to the `gh-pages` branch, which GitHub Pages serves. `NEXT_PUBLIC_BASE_PATH` sets the sub-path (`/WebTest`), and `src/lib/asset.ts` prefixes model and texture URLs with it.
 
 ## Routes
 
