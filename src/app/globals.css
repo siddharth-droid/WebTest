@@ -457,8 +457,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     grid-template-rows: 1fr auto auto;
     padding-top: 64px;
   }
-  .rail { display: none; }
-  .inspector { grid-column: 1; align-self: end; max-height: 46svh; overflow-y: auto; }
+  /* Phones: the list is a bottom panel; picking a satellite swaps it for the inspector */
+  .rail { grid-row: 2; max-height: 44svh; }
+  .console:has(.inspector-head) .rail { display: none; }
+  .inspector:has(.inspector-empty) { display: none; }
+  .console .inspector { max-height: 46svh; }
+  .console .timebar { grid-row: 3; }
+  .site-nav { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 120px); }
+  .site-nav a { padding: 8px 8px; white-space: nowrap; }
+  .inspector { grid-column: 1; grid-row: 2; align-self: end; max-height: 46svh; overflow-y: auto; }
   .track { display: none; }
 }
 
