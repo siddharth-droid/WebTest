@@ -11,8 +11,8 @@ import { RADIANCE } from '@/components/globe/units';
 
 /**
  * Every tracked satellite where it is at the moment the page loads, as a
- * static point cloud. Loaded lazily the first time it becomes visible, since
- * the catalog is a few megabytes.
+ * static point cloud. The catalog is a few megabytes, so it is fetched once
+ * the page has settled and propagated a slice at a time between frames.
  */
 export function RealConstellation({ earthRadius, opacity }: { earthRadius: number; opacity: () => number }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
@@ -30,15 +30,27 @@ export function RealConstellation({ earthRadius, opacity }: { earthRadius: numbe
     [],
   );
   const group = useRef<THREE.Group>(null);
+  const warmed = useRef(false);
+
+  const start = () => {
+    if (requested.current) return;
+    requested.current = true;
+    build(earthRadius).then(setGeometry, () => undefined);
+  };
+  useEffect(() => {
+    const t = window.setTimeout(start, 4000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useFrame(() => {
     const a = opacity();
-    if (a > 0.01 && !requested.current) {
-      requested.current = true;
-      build(earthRadius).then(setGeometry, () => undefined);
-    }
+    if (a > 0.01) start();
     material.opacity = a;
-    if (group.current) group.current.visible = a > 0.01;
+    if (!group.current) return;
+    // Draw once (invisibly) as soon as it exists, so the shader compiles before it is needed
+    group.current.visible = a > 0.01 || (geometry !== null && !warmed.current);
+    if (geometry) warmed.current = true;
   });
 
   useEffect(() => () => geometry?.dispose(), [geometry]);
@@ -52,7 +64,13 @@ async function build(earthRadius: number) {
   const pos: number[] = [];
   const col: number[] = [];
   const c = new THREE.Color();
+  let sliceStart = performance.now();
   for (const sat of catalog.sats) {
+    // Yield every few milliseconds so frames keep flowing while this runs
+    if (performance.now() - sliceStart > 6) {
+      await new Promise((r) => setTimeout(r, 0));
+      sliceStart = performance.now();
+    }
     const pv = propagate(satrecFor(sat), now);
     if (!pv) continue;
     const s = earthRadius / 6371;

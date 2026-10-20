@@ -44,6 +44,7 @@ uniform float uCloudsChannel; // 0: greyscale map (R), 1: packed legacy map (B)
 uniform vec3 uSun;            // world space, normalised
 uniform float uIntensity;     // radiance scale to match the atmosphere's units
 uniform float uCloudOffset;
+uniform float uDetail;        // 0 on slower GPUs: skip the procedural close-up detail
 
 varying vec2 vUv;
 varying vec3 vWorld;
@@ -102,7 +103,7 @@ void main() {
   float clouds = cloudAt(vUv);
   // Up close the 8K cloud map is softer than a pixel; add procedural detail at cloud edges,
   // fading in as the texture gets magnified on screen
-  float magnified = smoothstep(2.5e-4, 0.6e-4, fwidth(vUv.x));
+  float magnified = smoothstep(2.5e-4, 0.6e-4, fwidth(vUv.x)) * uDetail;
   if (magnified > 0.0) {
     vec2 q = vUv * vec2(4096.0, 2048.0);
     float detail = fbm(q) * 0.65 + fbm(q * 4.3) * 0.35;
@@ -140,7 +141,8 @@ void main() {
   // Keep Black Marble's moonlit land as a faint base; only real city lights glow
   vec3 nightTex = texture2D(uNight, vUv).rgb;
   float lum = dot(nightTex, vec3(0.2126, 0.7152, 0.0722));
-  vec3 lights = vec3(1.0, 0.72, 0.42) * smoothstep(0.1, 0.75, lum) * 1.6 + nightTex * 0.04;
+  // A soft ramp, not a plateau, so cities fade out at their edges instead of reading as flat blobs
+  vec3 lights = vec3(1.0, 0.72, 0.42) * pow(smoothstep(0.06, 0.9, lum), 1.8) * 2.0 + nightTex * 0.04;
   vec3 night = lights * (1.0 - smoothstep(-0.18, 0.05, NdL)) * (1.0 - clouds * 0.75) * 0.9;
 
   // Sunlit surface in the atmosphere's units: albedo × solar irradiance / π (≈ 0.58 × albedo)
@@ -154,7 +156,7 @@ void main() {
   vec3 skyBlue = vec3(0.16, 0.36, 0.95) * 0.30;
   vec3 twilight = vec3(0.95, 0.42, 0.22) * 0.05;
   vec3 air = mix(twilight, skyBlue, smoothstep(-0.03, 0.05, NdL)) * smoothstep(-0.12, 0.06, NdL);
-  color = mix(color, air, haze * 0.8);
+  color = mix(color, air, haze * 0.72);
 
   color += night * uIntensity;
   gl_FragColor = vec4(color, 1.0);

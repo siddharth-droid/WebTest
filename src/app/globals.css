@@ -102,6 +102,18 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* ------------------------------------------------------------------ canvas */
 .stage { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+/* Lens vignette, composited by the browser instead of a full-screen shader pass */
+.stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 120% 95% at 50% 50%, transparent 52%, rgb(0 0 0 / 0.55) 100%);
+}
+
+/* Slower GPUs: frosted panels re-blur the live canvas every frame, so make them solid */
+html[data-quality='low'] .rail,
+html[data-quality='low'] .inspector { backdrop-filter: none; background: rgb(4 7 14 / 0.92); }
 
 /* ------------------------------------------------------------------ story */
 .story { position: relative; z-index: 2; }
@@ -190,6 +202,18 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 .hero-foot p { grid-column: 1 / span 4; color: var(--fg-2); font-size: 15px; line-height: 1.55; }
 .hero-foot .mono { color: var(--fg-3); }
+.hero-foot .live-readout { display: inline-flex; align-items: baseline; gap: 10px; color: var(--fg-2); }
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal);
+  flex: none;
+  align-self: center;
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes live-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 .hero-foot .mono:nth-child(2) { grid-column: 7 / span 3; }
 .hero-foot .mono:nth-child(3) { grid-column: 10 / span 3; text-align: right; }
 

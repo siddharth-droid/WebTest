@@ -58,7 +58,7 @@ export function StoryExperience() {
         if (chapter.look) tl.to(story.look, { ...chapter.look }, at);
         if (chapter.sat) tl.to(story.sat, { ...chapter.sat }, at);
         // Travel along the orbit at a steady pace: this is what makes the camera "fly with" the station
-        if (chapter.orbitU !== undefined) tl.to(story, { orbitU: chapter.orbitU, ease: 'none' }, at);
+        if (chapter.minutes !== undefined) tl.to(story, { minutes: chapter.minutes, ease: 'none' }, at);
         tl.to(story, { global: chapter.global ?? 0, constellation: chapter.constellation ?? 0, frameX: chapter.frameX ?? 0 }, at);
         // Hotspots fade in as the camera settles and out as the next move starts
         if (chapter.labels) {
@@ -100,6 +100,9 @@ export function StoryExperience() {
     { scope: root },
   );
 
+  const [sceneReady, setSceneReady] = useState(false);
+  const markSceneReady = useCallback(() => setSceneReady(true), []);
+
   // Intro: fly in from deep space once the assets are on the GPU
   const playIntro = useCallback(() => {
     setReady(true);
@@ -119,8 +122,8 @@ export function StoryExperience() {
   return (
     <>
       <SmoothScroll />
-      <Loader onDone={playIntro} />
-      <StoryScene />
+      <Loader onDone={playIntro} ready={sceneReady} />
+      <StoryScene onReady={markSceneReady} />
 
       <div ref={root} className="story" style={{ visibility: ready ? 'visible' : 'hidden' }}>
         <section className="chapter hero">
@@ -132,7 +135,7 @@ export function StoryExperience() {
             <p>
               A live view of everything humanity has in orbit, built entirely on open data from CelesTrak, NASA and NOAA.
             </p>
-            <span className="mono tabular">{counts ? `${counts.satellites.toLocaleString('en-US')} objects tracked today` : 'Tracking live'}</span>
+            <LiveReadout />
             <span className="mono">Scroll to explore</span>
           </div>
         </section>
@@ -205,5 +208,25 @@ export function StoryExperience() {
         <div className="progress"><i ref={progress} /></div>
       </div>
     </>
+  );
+}
+
+/** Where the station in the scene really is right now; written to the DOM twice a second. */
+function LiveReadout() {
+  const el = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const fmt = (v: number, pos: string, neg: string) => `${Math.abs(v).toFixed(1)}°${v >= 0 ? pos : neg}`;
+    const id = window.setInterval(() => {
+      const l = story.live;
+      if (!l.ready || !el.current || story.minutes > 0.05) return;
+      el.current.textContent = `ISS ${fmt(l.lat, 'N', 'S')} ${fmt(l.lon, 'E', 'W')} · ${Math.round(l.alt)} km · ${l.sunlit ? 'daylight' : 'night'}`;
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span className="mono tabular live-readout">
+      <i className="live-dot" aria-hidden />
+      <span ref={el}>Locating the ISS</span>
+    </span>
   );
 }
