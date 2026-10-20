@@ -47,7 +47,7 @@ const keepColor = (src: THREE.MeshStandardMaterial) => src.color.clone();
  */
 const UPGRADES: [RegExp, Upgrade][] = [
   [
-    /solarpanel-(face|\d)/i,
+    /solarpanel-(face|\d)|SolarPanels/i,
     (src) =>
       new THREE.MeshPhysicalMaterial({
         color: keepColor(src).multiplyScalar(0.75),
@@ -60,7 +60,7 @@ const UPGRADES: [RegExp, Upgrade][] = [
       }),
   ],
   [
-    /gold|mainpanels|bronze|mainsections/i,
+    /gold|mainpanels|bronze|mainsections|^Brown$/i,
     (src) =>
       new THREE.MeshStandardMaterial({
         color: keepColor(src).offsetHSL(0, 0.08, 0.04),
@@ -71,7 +71,7 @@ const UPGRADES: [RegExp, Upgrade][] = [
       }),
   ],
   [
-    /silver/i,
+    /silver|Metal1$/i,
     (src) => new THREE.MeshStandardMaterial({ color: keepColor(src).multiplyScalar(1.3), metalness: 1, roughness: 0.2 }),
   ],
   [
@@ -85,7 +85,7 @@ const UPGRADES: [RegExp, Upgrade][] = [
         bumpScale: 0.6,
       }),
   ],
-  [/grey/i, (src) => new THREE.MeshStandardMaterial({ color: keepColor(src), metalness: 0.7, roughness: 0.4 })],
+  [/grey|gray|DarkMetal/i, (src) => new THREE.MeshStandardMaterial({ color: keepColor(src), metalness: 0.7, roughness: 0.4 })],
   [
     /thruster-in/i,
     () => new THREE.MeshStandardMaterial({ color: '#000', emissive: '#ff6a2a', emissiveIntensity: 2.2, side: THREE.DoubleSide }),
@@ -99,9 +99,14 @@ const UPGRADES: [RegExp, Upgrade][] = [
 export function upgradeMaterial(src: THREE.Material): THREE.Material {
   if (!(src instanceof THREE.MeshStandardMaterial)) return src;
   const match = UPGRADES.find(([re]) => re.test(src.name));
-  const out = match
-    ? match[1](src)
-    : new THREE.MeshStandardMaterial({ color: keepColor(src), metalness: 0.5, roughness: 0.55 });
+  if (!match) {
+    // Unknown part: keep everything the artist set (including textures), just less plastic
+    const kept = src.clone();
+    kept.metalness = Math.max(kept.metalness, 0.3);
+    kept.roughness = Math.min(kept.roughness, 0.6);
+    return kept;
+  }
+  const out = match[1](src);
   out.name = src.name;
   out.side = src.side;
   return out;

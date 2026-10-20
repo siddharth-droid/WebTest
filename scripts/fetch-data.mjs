@@ -14,7 +14,7 @@
  * If a source fails, the previously published file is kept (fetched from
  * FALLBACK_BASE, the live site), so one flaky API never blanks the site.
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const OUT = join(process.cwd(), 'public', 'data');
@@ -141,6 +141,8 @@ function normaliseLaunch(l) {
     id: l.id,
     name: l.name,
     net: l.net,
+    // How exact `net` is: Second/Minute/Hour/Day/Month/Quarter/Half/Year. Coarse dates are placeholders.
+    netPrecision: pick(l.net_precision?.name, l.net_precision?.abbrev),
     windowStart: l.window_start ?? null,
     windowEnd: l.window_end ?? null,
     status: pick(l.status?.abbrev, l.status?.name),
@@ -199,7 +201,8 @@ async function spaceWeather() {
   let forecast = [];
   try {
     forecast = table(await get(`${SWPC}/products/noaa-planetary-k-index-forecast.json`))
-      .filter((r) => (r.observed ?? '').toLowerCase() === 'predicted')
+      .filter((r) => ['predicted', 'estimated'].includes((r.observed ?? '').toLowerCase()))
+      .filter((r) => !observed.some((o) => o.time === r.time_tag))
       .map((r) => ({ time: r.time_tag, kp: Number(r.kp ?? r.Kp), scale: r.noaa_scale || null }));
   } catch (err) {
     console.warn(`! kp forecast: ${err.message}`);
@@ -260,7 +263,22 @@ const results = {
   'space-weather.json': await produce('space-weather.json', spaceWeather),
   'events.json': await produce('events.json', earthEvents),
 };
-await write('manifest.json', { builtAt: new Date().toISOString(), files: results });
+const count = async (name, fn) => {
+  try {
+    return fn(JSON.parse(await readFile(join(OUT, name), 'utf8')));
+  } catch {
+    return null;
+  }
+};
+await write('manifest.json', {
+  builtAt: new Date().toISOString(),
+  files: results,
+  counts: {
+    satellites: await count('satellites.json', (d) => d.rows.length),
+    launches: await count('launches.json', (d) => d.upcoming.length),
+    events: await count('events.json', (d) => d.events.length),
+  },
+});
 if (!results['satellites.json']) {
   console.error('Satellite data is required; aborting.');
   process.exit(1);

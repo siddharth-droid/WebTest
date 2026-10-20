@@ -8,7 +8,7 @@ import { Earth } from './Earth';
 import { Satellite } from './Satellite';
 import { Starfield } from './Starfield';
 import { SpaceLighting } from './SpaceLighting';
-import { Constellation } from './Constellation';
+import { RealConstellation } from './RealConstellation';
 import { Effects } from './Effects';
 
 const SUN = new THREE.Vector3(1, 0.4, 0.45).normalize();
@@ -84,7 +84,7 @@ export default function StoryScene() {
           <Starfield />
           <group position={EARTH_POSITION} rotation-z={0.38}>
             <Earth radius={EARTH_RADIUS} sun={SUN} spin={(t) => t * 0.006 + story.earthSpin} />
-            <Constellation earthRadius={EARTH_RADIUS} opacity={() => story.constellation} linkRange={0.7} />
+            <RealConstellation earthRadius={EARTH_RADIUS} opacity={() => story.constellation} />
           </group>
           <StorySatellite />
           <Effects />

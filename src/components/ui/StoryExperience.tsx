@@ -9,6 +9,7 @@ import { useGSAP } from '@gsap/react';
 import { ReactLenis, useLenis, type LenisRef } from 'lenis/react';
 import { CHAPTERS, story } from '@/lib/story';
 import { Loader } from './Loader';
+import { useData } from '@/lib/data';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -33,6 +34,8 @@ export function StoryExperience() {
   const progress = useRef<HTMLElement>(null);
   const [active, setActive] = useState(0);
   const [ready, setReady] = useState(false);
+  const manifest = useData<{ counts?: { satellites: number; launches: number; events: number } }>('manifest.json');
+  const counts = manifest.status === 'ready' ? manifest.data.counts : undefined;
 
   // Scroll → 3D. One master timeline, scrubbed by scroll position.
   useGSAP(
@@ -127,73 +130,71 @@ export function StoryExperience() {
       <div ref={root} className="story" style={{ visibility: ready ? 'visible' : 'hidden' }}>
         <section className="chapter hero">
           <h1 className="hero-title">
-            <span className="line"><span>Orbital</span></span>
-            <span className="line"><span>Intelligence</span></span>
+            <span className="line"><span>Every satellite.</span></span>
+            <span className="line"><span>Right now.</span></span>
           </h1>
           <div className="hero-foot">
             <p>
-              A constellation of compute satellites that process data in orbit, so the ground receives answers,
-              not raw imagery.
+              A live view of everything humanity has in orbit, built entirely on open data from CelesTrak, NASA and NOAA.
             </p>
-            <span className="mono">30 spacecraft · 6 planes</span>
+            <span className="mono tabular">{counts ? `${counts.satellites.toLocaleString('en-US')} objects tracked today` : 'Tracking live'}</span>
             <span className="mono">Scroll to explore</span>
           </div>
         </section>
 
         <section className="chapter" data-align="right">
           <div className="chapter-copy" data-reveal>
-            <div className="chapter-meta mono"><b>02</b><span>Power subsystem</span></div>
-            <h2>Sunlight in. Compute out.</h2>
+            <div className="chapter-meta mono"><b>02</b><span>Landsat 8</span></div>
+            <h2>One spacecraft, the whole planet.</h2>
             <p>
-              A single deployable wing tracks the sun through every orbit. Power that used to run a camera now runs
-              a datacenter-class accelerator.
+              Landsat 8 has photographed every point on Earth&rsquo;s land every 16 days since 2013, crossing the equator at
+              the same local time on each orbit so shadows always fall the same way.
             </p>
             <dl className="spec">
-              <div><dt className="mono">Array output</dt><dd className="tabular">4.3 kW</dd></div>
-              <div><dt className="mono">Eclipse reserve</dt><dd className="tabular">38 min</dd></div>
+              <div><dt className="mono">Altitude</dt><dd className="tabular">705 km</dd></div>
+              <div><dt className="mono">Repeat cycle</dt><dd className="tabular">16 days</dd></div>
             </dl>
           </div>
         </section>
 
         <section className="chapter" data-align="left">
           <div className="chapter-copy" data-reveal>
-            <div className="chapter-meta mono"><b>03</b><span>Compute payload</span></div>
-            <h2>Inference at the edge of space.</h2>
+            <div className="chapter-meta mono"><b>03</b><span>Instruments</span></div>
+            <h2>Seeing in light we can&rsquo;t.</h2>
             <p>
-              Sensor data is processed seconds after capture. A wildfire perimeter downlinks as 2 KB of geometry,
-              not 40 GB of pixels.
+              Two imagers share the instrument deck: one for visible and infrared light, one for heat. Together they map
+              crops, glaciers, wildfire scars and city growth.
             </p>
             <dl className="spec">
-              <div><dt className="mono">Throughput</dt><dd className="tabular">220 TOPS</dd></div>
-              <div><dt className="mono">Downlink saved</dt><dd className="tabular">99.6%</dd></div>
+              <div><dt className="mono">Swath</dt><dd className="tabular">185 km</dd></div>
+              <div><dt className="mono">Imagers</dt><dd className="tabular">OLI + TIRS</dd></div>
             </dl>
           </div>
         </section>
 
         <section className="chapter" data-align="right">
           <div className="chapter-copy" data-reveal>
-            <div className="chapter-meta mono"><b>04</b><span>Constellation</span></div>
-            <h2>One mesh. Whole planet.</h2>
+            <div className="chapter-meta mono"><b>04</b><span>Everything in orbit</span></div>
+            <h2>It&rsquo;s getting crowded up there.</h2>
             <p>
-              Six orbital planes in a Walker-delta pattern. Laser crosslinks route results between spacecraft to
-              whichever ground station is in view.
+              Each dot is a real object, placed where it was when you opened this page. Most of the blue shell is Starlink,
+              launched in the last few years.
             </p>
             <dl className="spec">
-              <div><dt className="mono">Revisit</dt><dd className="tabular">&lt; 12 min</dd></div>
-              <div><dt className="mono">Crosslink</dt><dd className="tabular">100 Gbps</dd></div>
+              <div><dt className="mono">Tracked objects</dt><dd className="tabular">{counts ? counts.satellites.toLocaleString('en-US') : '–'}</dd></div>
+              <div><dt className="mono">Launches queued</dt><dd className="tabular">{counts ? counts.launches : '–'}</dd></div>
             </dl>
           </div>
         </section>
 
         <section className="chapter closing">
           <div className="closing-inner" data-reveal>
-            <div className="chapter-meta mono"><b>05</b><span>Operations</span></div>
-            <h2>Watch it fly.</h2>
+            <div className="chapter-meta mono"><b>05</b><span>Explore</span></div>
+            <h2>Look up.</h2>
             <div className="closing-actions mono">
-              <Link className="button" href="/fleet">Open fleet console <span aria-hidden>→</span></Link>
-              <a className="button" data-variant="ghost" href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0 }); }}>
-                Back to top
-              </a>
+              <Link className="button" href="/track/">Open the live tracker <span aria-hidden>→</span></Link>
+              <Link className="button" data-variant="ghost" href="/launches/">Launch schedule</Link>
+              <Link className="button" data-variant="ghost" href="/aurora/">Aurora forecast</Link>
             </div>
           </div>
         </section>

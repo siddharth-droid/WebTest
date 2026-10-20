@@ -31,7 +31,7 @@ export const CHAPTERS = [
   },
   {
     id: 'power',
-    label: 'Power',
+    label: 'Landsat 8',
     camera: { x: 1.6, y: 1.8, z: 7.5 },
     target: { x: -0.4, y: -1.0, z: -1 },
     satellite: { rx: 0.15, ry: -2.0, rz: 0.1 },
@@ -39,7 +39,7 @@ export const CHAPTERS = [
   },
   {
     id: 'compute',
-    label: 'Compute',
+    label: 'Instruments',
     camera: { x: -0.4, y: 0.6, z: 4.4 },
     target: { x: -1.0, y: 0.0, z: 0 },
     satellite: { rx: 0.05, ry: -2.7, rz: 0.0 },
@@ -47,7 +47,7 @@ export const CHAPTERS = [
   },
   {
     id: 'network',
-    label: 'Network',
+    label: 'Everything',
     camera: { x: 10, y: 20, z: 42 },
     target: { x: 5, y: -12, z: -10 },
     satellite: { rx: 0.4, ry: -1.4, rz: 0.1 },
@@ -56,7 +56,7 @@ export const CHAPTERS = [
   },
   {
     id: 'launch',
-    label: 'Launch',
+    label: 'Explore',
     camera: { x: 0, y: 1.8, z: 15 },
     target: { x: 0, y: -1.6, z: 0 },
     satellite: { rx: 0.25, ry: -2.4, rz: 0.15 },

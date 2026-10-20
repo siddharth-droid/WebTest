@@ -5,8 +5,11 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const NAV = [
-  { href: '/', label: 'Mission' },
-  { href: '/fleet', label: 'Fleet' },
+  { href: '/', label: 'Overview' },
+  { href: '/track/', label: 'Track' },
+  { href: '/launches/', label: 'Launches' },
+  { href: '/aurora/', label: 'Aurora' },
+  { href: '/earth/', label: 'Earth' },
 ];
 
 function UtcClock() {
@@ -29,7 +32,7 @@ export function SiteHeader() {
       </Link>
       <nav className="site-nav mono" aria-label="Primary">
         {NAV.map((item) => (
-          <Link key={item.href} href={item.href} aria-current={pathname === item.href ? 'page' : undefined}>
+          <Link key={item.href} href={item.href} aria-current={pathname.replace(/\/$/, '') === item.href.replace(/\/$/, '') ? 'page' : undefined}>
             {item.label}
           </Link>
         ))}

@@ -3,8 +3,9 @@ import { SiteHeader } from '@/components/ui/SiteHeader';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: 'Orbita: Orbital Intelligence', template: '%s · Orbita' },
-  description: 'A constellation of compute satellites that process data in orbit and deliver answers, not raw imagery.',
+  title: { default: 'Orbita: every satellite, live', template: '%s · Orbita' },
+  description:
+    'Track every satellite in real time, see when the ISS passes over you, follow rocket launches, aurora forecasts and live Earth events. Built on open data.',
 };
 
 export const viewport: Viewport = {

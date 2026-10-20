@@ -8,7 +8,12 @@ import { asset } from '@/lib/asset';
 import { upgradeMaterial } from '@/lib/materials';
 import { story, type HotspotKey } from '@/lib/story';
 
-const MODEL = asset('/models/landsat8.glb');
+export const MODELS = {
+  landsat8: asset('/models/landsat8.glb'),
+  iss: asset('/models/iss.glb'),
+  hubble: asset('/models/hubble.glb'),
+};
+export type ModelId = keyof typeof MODELS;
 
 // Parts that make up the spacecraft body (the wing's frame reuses bronze/grey, so those are excluded)
 const BUS_PARTS = /^LDCM-(gold-cyl|silver|white-sm|darkbronze)/;
@@ -21,12 +26,13 @@ const HOTSPOT_PARTS: Record<HotspotKey, RegExp> = {
 };
 
 const HOTSPOT_COPY: Record<HotspotKey, { title: string; detail: string; side: 'left' | 'right' }> = {
-  array: { title: 'Solar array', detail: '4.3 kW · triple-junction GaAs', side: 'right' },
-  instrument: { title: 'Compute payload', detail: 'Rad-hard inference core', side: 'left' },
-  propulsion: { title: 'Propulsion', detail: 'Hydrazine · 8 × 22 N', side: 'right' },
+  array: { title: 'Solar array', detail: 'Single deployable wing', side: 'right' },
+  instrument: { title: 'Instrument deck', detail: 'OLI + TIRS imagers', side: 'left' },
+  propulsion: { title: 'Propulsion', detail: 'Hydrazine thrusters', side: 'right' },
 };
 
 interface SatelliteProps {
+  model?: ModelId;
   /** Longest dimension of the model in scene units. */
   size?: number;
   hotspots?: boolean;
@@ -34,8 +40,8 @@ interface SatelliteProps {
   float?: boolean;
 }
 
-export function Satellite({ size = 4, hotspots = false, float = true }: SatelliteProps) {
-  const { scene } = useGLTF(MODEL);
+export function Satellite({ model: modelId = 'landsat8', size = 4, hotspots = false, float = true }: SatelliteProps) {
+  const { scene } = useGLTF(MODELS[modelId]);
   const floatRef = useRef<THREE.Group>(null);
 
   const { model, offset, scale, anchors } = useMemo(() => {
@@ -43,6 +49,10 @@ export function Satellite({ size = 4, hotspots = false, float = true }: Satellit
     model.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         o.material = Array.isArray(o.material) ? o.material.map(upgradeMaterial) : upgradeMaterial(o.material);
+        // Ambient occlusion baked into vertex colours in Blender (scripts/blender/bake_ao.py)
+        if (o.geometry.attributes.color) {
+          for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.vertexColors = true;
+        }
       }
     });
     model.updateMatrixWorld(true);
@@ -56,7 +66,7 @@ export function Satellite({ size = 4, hotspots = false, float = true }: Satellit
     model.traverse((o) => {
       if (o instanceof THREE.Mesh && BUS_PARTS.test((o.material as THREE.Material).name)) bus.expandByObject(o);
     });
-    const center = (bus.isEmpty() ? bounds : bus).getCenter(new THREE.Vector3());
+    const center = (bus.isEmpty() || modelId !== 'landsat8' ? bounds : bus).getCenter(new THREE.Vector3());
 
     // Find each hotspot's anchor as the centre of the parts it refers to
     const anchors = {} as Record<HotspotKey, THREE.Vector3>;
@@ -71,7 +81,7 @@ export function Satellite({ size = 4, hotspots = false, float = true }: Satellit
     }
 
     return { model, offset: center.clone().negate(), scale: size / Math.max(dims.x, dims.y, dims.z), anchors };
-  }, [scene, size]);
+  }, [scene, size, modelId]);
 
   useFrame((state) => {
     if (!float || !floatRef.current) return;
@@ -122,4 +132,4 @@ function Hotspot({ id, position }: { id: HotspotKey; position: THREE.Vector3 }) 
   );
 }
 
-useGLTF.preload(MODEL);
+useGLTF.preload(MODELS.landsat8);
