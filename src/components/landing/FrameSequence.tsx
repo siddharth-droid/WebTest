@@ -61,7 +61,7 @@ export function FrameSequence({ onProgress }: { onProgress?: (loaded: number) =>
 
     // Smaller frames for small or data-saving screens
     const saveData = (navigator as { connection?: { saveData?: boolean } }).connection?.saveData;
-    const width = !saveData && window.innerWidth * Math.min(window.devicePixelRatio, 2) > 1300 ? 1600 : 960;
+    const width = !saveData && window.innerWidth * Math.min(window.devicePixelRatio, 2) > 1100 ? 1440 : 960;
     const dir = asset(`/landing/${width}/`);
 
     const resize = () => {

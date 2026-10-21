@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageFilter
 
-SIZES = {1600: 72, 960: 68}
+SIZES = {1440: 72, 960: 68}  # native render width, and a lighter set for phones
 
 src, dst = Path(sys.argv[1]), Path(sys.argv[2])
 frames = sorted(src.glob('f_*.png'))

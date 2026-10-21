@@ -226,7 +226,17 @@ a.readout-note:hover { color: var(--fg); }
   text-transform: uppercase;
 }
 .hero-title .line { display: block; overflow: hidden; padding-bottom: 0.04em; }
-.hero-title .line > span { display: inline-block; will-change: transform; }
+.hero-title .line > span { display: inline-block; white-space: nowrap; will-change: transform; }
+/* Keeps the hero copy legible where it sits over bright cloud */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 45% 0 0 0;
+  z-index: -1;
+  background: linear-gradient(transparent, rgb(2 4 10 / 0.8));
+  pointer-events: none;
+}
+.closing-actions .button[data-variant='ghost'] { text-shadow: 0 1px 10px rgb(2 4 10 / 0.9), 0 0 2px rgb(2 4 10 / 0.9); }
 /* Tight display tracking pulls the full stop into the preceding letter; give it its own air */
 .hero-title .punct { display: inline-block; margin-left: 0.07em; letter-spacing: 0; }
 .hero-foot {
@@ -538,7 +548,26 @@ a.readout-note:hover { color: var(--fg); }
   .inspector:has(.inspector-empty) { display: none; }
   .console .inspector { max-height: 46svh; }
   .console .timebar { grid-row: 3; }
-  .site-nav { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 120px); }
+  .site-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: calc(100vw - 120px);
+    /* Fade the edge so it is clear the nav scrolls */
+    mask-image: linear-gradient(to right, #000 82%, transparent);
+  }
+  /* Landing on phones: copy sits on a dark panel over the imagery, and the station
+     labels give way to the text */
+  .sequence-label { display: none; }
+  .chapter-copy::before,
+  .closing-inner::before {
+    content: '';
+    position: absolute;
+    inset: -28px calc(var(--gutter) * -1);
+    z-index: -1;
+    background: linear-gradient(rgb(2 4 10 / 0), rgb(2 4 10 / 0.78) 18%, rgb(2 4 10 / 0.78) 82%, rgb(2 4 10 / 0));
+    pointer-events: none;
+  }
+  .closing-inner { position: relative; }
   .site-nav a { padding: 8px 8px; white-space: nowrap; }
   .inspector { grid-column: 1; grid-row: 2; align-self: end; max-height: 46svh; overflow-y: auto; }
   .track { display: none; }

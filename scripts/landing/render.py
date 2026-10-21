@@ -5,7 +5,7 @@ browser only ever draws a picture, so it is smooth on any device.
 
 Run with Blender's Python (Blender 4.2+ or `pip install bpy`):
 
-    python scripts/landing/render.py OUT_DIR [--frames 0,45,90] [--scale 50] [--samples 32]
+    python scripts/landing/render.py OUT_DIR [--frames 0,45,90] [--scale 50] [--samples 16]
 
 Inputs (relative to the repo root):
     public/textures/earth/*-8k.jpg   CI-built NASA textures (see fetch-earth-textures.mjs)
@@ -38,9 +38,9 @@ p.add_argument('--constellation', required=True)
 p.add_argument('--textures', default='public/textures')
 p.add_argument('--frames', default='all')
 p.add_argument('--scale', type=int, default=100)
-p.add_argument('--samples', type=int, default=32)
-p.add_argument('--width', type=int, default=1600)
-p.add_argument('--height', type=int, default=900)
+p.add_argument('--samples', type=int, default=16)
+p.add_argument('--width', type=int, default=1440)
+p.add_argument('--height', type=int, default=810)
 args = p.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:])
 
 R = 6371.0
