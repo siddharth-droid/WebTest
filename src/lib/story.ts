@@ -65,12 +65,13 @@ export const CHAPTERS: Chapter[] = [
     id: 'sunrise',
     label: '16 sunrises',
     orbitU: 1.95,
-    cam: { back: 0.42, up: 0.09, side: -0.04 },
-    // The horizon sits ~20° below level from this altitude: aim at it
-    look: { ahead: 1.6, up: -0.64, side: 0 },
+    // Swing round in front of the station and look back along the orbit: the Sun sets
+    // behind it, about 17° above the horizon and a little to the left
+    cam: { back: -0.42, up: 0.12, side: 0.1 },
+    look: { ahead: -1.6, up: -0.35, side: -0.43 },
     sat: { yaw: 0, pitch: 0, roll: 0 },
     frameX: -0.2,
   },
   { id: 'everything', label: 'Everything', orbitU: 2.3, global: 1, constellation: 1, frameX: -0.2 },
-  { id: 'explore', label: 'Explore', orbitU: 2.5, global: 0.82, constellation: 0.35, frameX: 0.16 },
+  { id: 'explore', label: 'Explore', orbitU: 2.5, global: 0.82, constellation: 0.35, frameX: 0.3 },
 ];

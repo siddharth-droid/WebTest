@@ -14,7 +14,16 @@ import { RADIANCE } from '@/components/globe/units';
  * static point cloud. Loaded lazily the first time it becomes visible, since
  * the catalog is a few megabytes.
  */
-export function RealConstellation({ earthRadius, opacity }: { earthRadius: number; opacity: () => number }) {
+export function RealConstellation({
+  earthRadius,
+  opacity,
+  brightness = RADIANCE * 1.6,
+}: {
+  earthRadius: number;
+  opacity: () => number;
+  /** Colour scale: radiance units for the photoreal globe, 1 for the retro scene. */
+  brightness?: number;
+}) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const requested = useRef(false);
   const material = useMemo(
@@ -35,7 +44,7 @@ export function RealConstellation({ earthRadius, opacity }: { earthRadius: numbe
     const a = opacity();
     if (a > 0.01 && !requested.current) {
       requested.current = true;
-      build(earthRadius).then(setGeometry, () => undefined);
+      build(earthRadius, brightness).then(setGeometry, () => undefined);
     }
     material.opacity = a;
     if (group.current) group.current.visible = a > 0.01;
@@ -46,7 +55,7 @@ export function RealConstellation({ earthRadius, opacity }: { earthRadius: numbe
   return <group ref={group}>{geometry && <points geometry={geometry} material={material} />}</group>;
 }
 
-async function build(earthRadius: number) {
+async function build(earthRadius: number, brightness: number) {
   const catalog = parseCatalog(await loadData<SatelliteFile>('satellites.json'));
   const now = new Date();
   const pos: number[] = [];
@@ -57,7 +66,7 @@ async function build(earthRadius: number) {
     if (!pv) continue;
     const s = earthRadius / 6371;
     pos.push(pv.position.x * s, pv.position.z * s, -pv.position.y * s);
-    c.set(groupOf(sat.category).color).multiplyScalar(RADIANCE * 1.6);
+    c.set(groupOf(sat.category).color).multiplyScalar(brightness);
     col.push(c.r, c.g, c.b);
   }
   const g = new THREE.BufferGeometry();

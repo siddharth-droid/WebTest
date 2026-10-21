@@ -1,23 +1,40 @@
 @import '@fontsource-variable/archivo/wdth.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/anton/400.css';
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+@import '@fontsource/space-mono/400.css';
+@import '@fontsource/space-mono/700.css';
 @import 'lenis/dist/lenis.css';
 
 /* ------------------------------------------------------------------ tokens */
 :root {
-  --bg: #02040a;
-  --fg: #e8edf5;
-  --fg-2: rgb(232 237 245 / 0.62);
-  --fg-3: rgb(232 237 245 / 0.38);
-  --rule: rgb(232 237 245 / 0.14);
-  --rule-strong: rgb(232 237 245 / 0.32);
-  --signal: #9fdcff;
-  --warn: #ffb547;
+  /* A 1970s print run: indigo ink, cream paper, and four spot colours */
+  --ink: #0d0e1a;
+  --navy: #1d2a5a;
+  --cream: #f2e6cc;
+  --mustard: #eaa93b;
+  --orange: #ec6f2e;
+  --red: #d23c2c;
+  --teal: #3fa7a9;
+
+  --bg: var(--ink);
+  --fg: var(--cream);
+  --fg-2: rgb(242 230 204 / 0.68);
+  --fg-3: rgb(242 230 204 / 0.42);
+  --rule: rgb(242 230 204 / 0.14);
+  --rule-strong: rgb(242 230 204 / 0.34);
+  --signal: #9fe3e6;
+  --warn: var(--mustard);
   --alert: #ff5a4f;
-  --panel: rgb(4 7 14 / 0.72);
+  --panel: rgb(13 14 26 / 0.78);
 
   --font-display: 'Archivo Variable', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-poster: 'Anton', 'Archivo Variable', sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-type: 'Space Mono', ui-monospace, monospace;
 
   --gutter: clamp(16px, 2.2vw, 32px);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -65,14 +82,14 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   position: absolute;
   inset: 0 0 -24px 0;
   z-index: -1;
-  background: linear-gradient(rgb(2 4 10 / 0.92), rgb(2 4 10 / 0.6) 55%, transparent);
+  background: linear-gradient(rgb(13 14 26 / 0.92), rgb(13 14 26 / 0.6) 55%, transparent);
   pointer-events: none;
 }
 .wordmark {
-  font-weight: 800;
-  font-variation-settings: 'wdth' 125;
-  font-size: 14px;
-  letter-spacing: 0.32em;
+  font-family: var(--font-poster);
+  font-size: 20px;
+  letter-spacing: 0.2em;
+  text-shadow: 0.06em 0.05em 0 var(--red);
 }
 .site-nav { display: flex; gap: 4px; }
 .site-nav a {
@@ -727,3 +744,186 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .map-scale-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; color: var(--fg-2); font-size: 10px; }
 .aurora-ramp { width: 120px; height: 6px; background: linear-gradient(90deg, rgb(40 170 110 / 0.2), rgb(90 220 130), rgb(160 255 150)); }
 @media (max-width: 860px) { .polar-pair { grid-template-columns: 1fr; } }
+
+/* ================================================================== retro landing
+   Cowboy Bebop by way of the 1975 NASA graphics manual: poster type with
+   misregistered ink, cream print cards with hard shadows, film grain. */
+
+/* Film grain over the page itself (static, so it costs nothing per frame) */
+.retro::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.retro .mono { font-family: var(--font-type); letter-spacing: 0.1em; }
+
+/* --- Opening titles */
+.title-seq {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  transition: opacity 0.7s var(--ease-out), visibility 0.7s;
+  cursor: pointer;
+}
+.title-seq[data-done='true'] { opacity: 0; visibility: hidden; }
+.ts-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  visibility: hidden;
+}
+.ts-panel span {
+  font-family: var(--font-poster);
+  font-size: clamp(120px, 34vw, 520px);
+  line-height: 0.8;
+  text-transform: uppercase;
+}
+.ts-panel:last-of-type span { font-size: clamp(72px, 17vw, 300px); }
+.ts-card { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 0 var(--gutter); }
+.ts-kicker { color: var(--mustard); }
+.ts-title {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: clamp(64px, 13vw, 200px);
+  line-height: 0.9;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0.035em 0.03em 0 var(--red), -0.025em -0.018em 0 rgb(63 167 169 / 0.85);
+}
+.ts-session { font-family: var(--font-serif); font-style: italic; font-size: clamp(22px, 2.6vw, 34px); color: var(--fg-2); }
+.ts-tuning { margin-top: 26px; color: var(--fg-3); }
+
+/* --- Hero */
+.retro .hero-sub {
+  grid-column: 1 / -1;
+  margin-bottom: 10px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(22px, 2.4vw, 36px);
+  color: var(--mustard);
+}
+.retro .hero-title {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-variation-settings: normal;
+  font-size: clamp(56px, 9.4vw, 176px);
+  line-height: 0.9;
+  letter-spacing: 0.005em;
+}
+/* Misregistered print: red and teal plates slightly off the cream */
+.retro .hero-title .line > span {
+  text-shadow: 0.03em 0.025em 0 var(--red), -0.02em -0.014em 0 rgb(63 167 169 / 0.8);
+}
+.retro .hero-title .punct { margin-left: 0.04em; color: var(--mustard); }
+.retro .hero-foot p { font-size: 16px; }
+.retro .hero-foot .mono:nth-child(2) { color: var(--mustard); }
+
+/* Mission patch */
+.patch {
+  position: absolute;
+  right: var(--gutter);
+  top: 92px;
+  width: clamp(110px, 11vw, 168px);
+  height: auto;
+  overflow: visible;
+}
+.patch-ring { fill: var(--cream); }
+.patch-core { fill: var(--navy); }
+.patch-text { font-family: var(--font-type); font-size: 13.5px; letter-spacing: 0.18em; text-transform: uppercase; fill: var(--ink); font-weight: 700; }
+.patch-spin { transform-origin: 100px 100px; animation: patch-spin 40s linear infinite; }
+.patch-sun { fill: var(--orange); }
+.patch-orbit { fill: none; stroke: var(--cream); stroke-width: 2.5; }
+.patch-sat { fill: var(--mustard); stroke: var(--ink); stroke-width: 2; }
+@keyframes patch-spin { to { transform: rotate(360deg); } }
+
+/* --- Session cards: cream stock, ink type, a hard red offset shadow */
+.retro .chapter-copy::before { display: none; }
+.session-card {
+  padding: 26px 28px 30px;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 10px 10px 0 var(--red);
+  transform: rotate(-0.6deg);
+}
+.chapter[data-align='right'] .session-card { transform: rotate(0.6deg); box-shadow: -10px 10px 0 var(--teal); }
+.session-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  border-bottom: 2px solid var(--ink);
+}
+.session-tag { color: var(--red); font-weight: 700; }
+.session-title { font-family: var(--font-serif); font-style: italic; font-size: 20px; }
+.retro .chapter h2 {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-variation-settings: normal;
+  font-size: clamp(36px, 3.7vw, 62px);
+  line-height: 0.95;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+.retro .session-card p { color: rgb(13 14 26 / 0.78); }
+.retro .session-card .spec { border-top-color: rgb(13 14 26 / 0.25); }
+.retro .session-card .spec div { border-bottom-color: rgb(13 14 26 / 0.25); }
+.retro .session-card .spec dt { color: rgb(13 14 26 / 0.55); }
+.retro .session-card .spec dd { font-family: var(--font-poster); font-weight: 400; font-size: 30px; font-variation-settings: normal; }
+
+/* --- Closing card */
+.retro .closing h2 {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-variation-settings: normal;
+  font-size: clamp(80px, 14vw, 260px);
+  letter-spacing: 0.005em;
+  text-shadow: 0.03em 0.025em 0 var(--red), -0.02em -0.014em 0 rgb(63 167 169 / 0.8);
+}
+.retro .closing .session-tag { color: var(--mustard); }
+.retro .signoff { font-family: var(--font-serif); font-style: italic; font-size: clamp(24px, 2.6vw, 40px); color: var(--fg-2); }
+.retro .button {
+  background: var(--cream);
+  color: var(--ink);
+  border: 0;
+  box-shadow: 5px 5px 0 var(--red);
+  font-weight: 700;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+.retro .button:hover { background: var(--mustard); color: var(--ink); transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--red); }
+.retro .button[data-variant='ghost'] { background: none; color: var(--fg-2); box-shadow: none; }
+.retro .button[data-variant='ghost']:hover { color: var(--mustard); transform: none; }
+
+/* --- HUD and labels */
+.retro .story-hud li[data-active='true'] { color: var(--mustard); }
+.retro .story-hud .progress > i { background: var(--mustard); height: 3px; margin-top: -1px; }
+.retro .hotspot-ring { border: 2px solid var(--cream); }
+.retro .hotspot-ring::after { background: var(--orange); }
+.retro .hotspot-leader { background: var(--cream); height: 2px; }
+.retro .hotspot-copy { padding: 6px 10px; background: var(--cream); color: var(--ink); border: 0; box-shadow: 4px 4px 0 var(--red); }
+.retro .hotspot[data-side='left'] .hotspot-copy { padding: 6px 10px; border: 0; }
+.retro .hotspot-copy strong { font-family: var(--font-poster); font-weight: 400; font-size: 17px; letter-spacing: 0.03em; font-variation-settings: normal; }
+.retro .hotspot-copy span { color: rgb(13 14 26 / 0.7); font-family: var(--font-type); }
+
+@media (max-width: 900px) {
+  .patch { top: 76px; width: 92px; }
+  .session-card { padding: 20px; box-shadow: 6px 6px 0 var(--red); }
+  .chapter[data-align='right'] .session-card { box-shadow: -6px 6px 0 var(--teal); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .patch-spin { animation: none; }
+}
+.retro .closing .signoff,
+.retro .closing .button[data-variant='ghost'] { text-shadow: 0 1px 12px var(--ink), 0 0 2px var(--ink); }
+.retro .hero-foot > * { text-shadow: 0 1px 10px var(--ink), 0 0 2px var(--ink); }

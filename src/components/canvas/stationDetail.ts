@@ -4,9 +4,8 @@ import * as THREE from 'three';
  * Sun-tracking solar wings for NASA's ISS model.
  *
  * On the real station each wing turns about its own mast (the "beta gimbal")
- * to face the Sun. The model ships the wings and their iROSA overlays as
- * loose meshes, so we gather each wing's parts under a pivot at the wing's
- * centre and rotate that pivot about the wing's long axis.
+ * to face the Sun. Each wing (with its iROSA overlay) is gathered under a
+ * pivot at the wing's centre, and that pivot turns about the wing's long axis.
  */
 export interface Wing {
   pivot: THREE.Object3D;
@@ -16,9 +15,14 @@ export interface Wing {
   angle: number;
 }
 
-/** "P4_Array_2A", "P6_2B_Array", "IROSA_Deployed_P44A" → "P4-2A" etc. */
+/**
+ * "wing-P4-2A" (joined in Blender by scripts/blender/optimize_iss.py), or the
+ * source model's loose parts "P4_Array_2A", "P6_2B_Array", "IROSA_Deployed_P44A" → "P4-2A" etc.
+ */
 function wingKey(name: string) {
-  let m = name.match(/^([PS]\d)_Array_(\d[AB])/) ?? name.match(/^([PS]\d)_(\d[AB])_Array/);
+  let m = name.match(/^wing-([PS]\d-\d[AB])(_\d+)?$/);
+  if (m) return m[1];
+  m = name.match(/^([PS]\d)_Array_(\d[AB])/) ?? name.match(/^([PS]\d)_(\d[AB])_Array/);
   if (m) return `${m[1]}-${m[2]}`;
   m = name.match(/^IROSA.*?([PS]\d)(\d[AB])/);
   if (m) return `${m[1]}-${m[2]}`;
@@ -34,7 +38,8 @@ export function buildWings(model: THREE.Object3D): Wing[] {
   const mains = new Map<string, THREE.Object3D>();
   model.traverse((o) => {
     const key = wingKey(o.name);
-    if (!key) return;
+    // A multi-material part loads as a group of meshes; move the group as one
+    if (!key || (o.parent && wingKey(o.parent.name) === key)) return;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(o);
     // The bare array mesh defines the wing's geometry and axes
