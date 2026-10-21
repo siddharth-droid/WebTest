@@ -287,32 +287,18 @@ a.readout-note:hover { color: var(--fg); }
 .story-hud .progress { justify-self: end; width: 160px; height: 1px; background: var(--rule); }
 .story-hud .progress > i { display: block; height: 100%; background: var(--fg); transform-origin: left; transform: scaleX(0); }
 
-/* Mirrored label for hotspots that sit on the right edge of the craft */
-.hotspot[data-side='left'] .hotspot-leader { left: auto; right: 7px; transform-origin: right; transform: rotate(32deg); }
-.hotspot[data-side='left'] .hotspot-copy {
-  left: auto;
-  right: 54px;
-  padding: 0 10px 0 0;
-  border-left: 0;
-  border-right: 1px solid var(--rule-strong);
-  text-align: right;
-}
-
-/* Leaders that point downward, for labels that would otherwise stack */
-.hotspot[data-v='down'] .hotspot-leader { transform: rotate(32deg); }
-.hotspot[data-v='down'] .hotspot-copy { top: 20px; }
-.hotspot[data-side='left'][data-v='down'] .hotspot-leader { transform: rotate(-32deg); }
-
-/* Hotspots (drei <Html>) */
-.hotspot { position: relative; width: 0; height: 0; transition: none; }
+/* Hotspot labels: a marker on the part, a leader out to the side, and the
+   text on a solid card so it stays legible over the bright station */
+.hotspot { position: relative; width: 0; height: 0; --reach: 96px; }
 .hotspot-ring {
   position: absolute;
-  left: -7px;
-  top: -7px;
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--fg);
+  left: -8px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--fg);
   border-radius: 50%;
+  box-shadow: 0 0 0 3px rgb(2 4 10 / 0.55), inset 0 0 0 3px rgb(2 4 10 / 0.55);
 }
 .hotspot-ring::after {
   content: '';
@@ -323,37 +309,60 @@ a.readout-note:hover { color: var(--fg); }
 }
 .hotspot-leader {
   position: absolute;
-  left: 7px;
+  left: 8px;
   top: 0;
-  width: 56px;
-  height: 1px;
-  background: var(--rule-strong);
+  width: var(--reach);
+  height: 1.5px;
+  background: var(--fg);
+  box-shadow: 0 0 0 1px rgb(2 4 10 / 0.45);
   transform-origin: left;
-  transform: rotate(-32deg);
+  transform: rotate(-34deg);
 }
 .hotspot-copy {
   position: absolute;
-  left: 54px;
-  top: -52px;
+  left: calc(var(--reach) * 0.83 + 8px);
+  top: calc(var(--reach) * -0.56 - 46px);
   display: grid;
   gap: 4px;
   white-space: nowrap;
-  padding-left: 10px;
-  border-left: 1px solid var(--rule-strong);
+  padding: 9px 14px 10px;
+  background: rgb(2 4 10 / 0.86);
+  border-left: 2px solid var(--signal);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
 }
 .hotspot-copy strong {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
-  font-variation-settings: 'wdth' 115;
+  font-variation-settings: 'wdth' 112;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 .hotspot-copy span {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--fg-2);
+}
+
+/* Mirrored: leader and card to the left of the marker */
+.hotspot[data-side='left'] .hotspot-leader { left: auto; right: 8px; transform-origin: right; transform: rotate(34deg); }
+.hotspot[data-side='left'] .hotspot-copy {
+  left: auto;
+  right: calc(var(--reach) * 0.83 + 8px);
+  border-left: 0;
+  border-right: 2px solid var(--signal);
+  text-align: right;
+}
+/* Pointing down, for labels that would otherwise stack */
+.hotspot[data-v='down'] .hotspot-leader { transform: rotate(34deg); }
+.hotspot[data-v='down'] .hotspot-copy { top: calc(var(--reach) * 0.56 - 6px); }
+.hotspot[data-side='left'][data-v='down'] .hotspot-leader { transform: rotate(-34deg); }
+
+@media (max-width: 900px) {
+  .hotspot { --reach: 54px; }
+  .hotspot-copy strong { font-size: 13px; }
+  .hotspot-copy span { display: none; }
 }
 
 /* ------------------------------------------------------------------ console */
