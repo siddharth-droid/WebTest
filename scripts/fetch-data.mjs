@@ -275,6 +275,12 @@ await write('manifest.json', {
   files: results,
   counts: {
     satellites: await count('satellites.json', (d) => d.rows.length),
+    // Starlink, OneWeb and Kuiper: the share of everything in orbit that is broadband internet
+    broadband: await count('satellites.json', (d) => {
+      const ids = ['Starlink', 'OneWeb', 'Kuiper'].map((c) => d.categories.indexOf(c));
+      const at = d.fields.indexOf('CATEGORY');
+      return d.rows.filter((r) => ids.includes(r[at])).length;
+    }),
     launches: await count('launches.json', (d) => d.upcoming.length),
     events: await count('events.json', (d) => d.events.length),
   },

@@ -10,6 +10,10 @@ import { ReactLenis, useLenis, type LenisRef } from 'lenis/react';
 import { CHAPTERS, FRAMES_PER_CHAPTER, story } from '@/lib/story';
 import { FrameSequence } from '@/components/landing/FrameSequence';
 import { useData } from '@/lib/data';
+import { useObserver } from '@/lib/observer';
+import type { Observer, Pass } from '@/lib/sat/passes';
+import { compass } from '@/lib/sat/sun';
+import { countdown, useIssNow, useIssRecord, useNextPass, useNow, useShadowChange } from '@/components/landing/live';
 
 gsap.registerPlugin(ScrollTrigger, SplitText, useGSAP);
 
@@ -33,8 +37,19 @@ export function StoryExperience() {
   const root = useRef<HTMLDivElement>(null);
   const progress = useRef<HTMLElement>(null);
   const [active, setActive] = useState(0);
-  const manifest = useData<{ counts?: { satellites: number; launches: number; events: number } }>('manifest.json');
+  const manifest = useData<{ counts?: { satellites: number; broadband?: number | null; launches: number; events: number } }>('manifest.json');
   const counts = manifest.status === 'ready' ? manifest.data.counts : undefined;
+
+  // Live: where the station is, its next sunset, when you can see it, the next launch
+  const now = useNow();
+  const rec = useIssRecord();
+  const iss = useIssNow(rec, now);
+  const shadow = useShadowChange(rec, now);
+  const { observer, locate, locating, error: locError } = useObserver();
+  const pass = useNextPass(rec, observer);
+  const launches = useData<{ upcoming: { net: string; rocket: string; mission: string }[] }>('launches.json');
+  const nextLaunch =
+    launches.status === 'ready' && now !== null ? launches.data.upcoming.find((l) => Date.parse(l.net) > now) : undefined;
 
   // Scroll → 3D. One master timeline, scrubbed by scroll position.
   useGSAP(
@@ -166,30 +181,27 @@ export function StoryExperience() {
 
         <section className="chapter" data-align="left">
           <div className="chapter-copy" data-reveal>
-            <div className="chapter-meta mono"><b>02</b><span>International Space Station</span></div>
-            <h2>A football field, 420 km up.</h2>
-            <p>
-              Sixteen pressurised modules from five space agencies, continuously crewed since November 2000. This is
-              NASA&rsquo;s own engineering model, down to the handrails.
-            </p>
-            <dl className="spec">
-              <div><dt className="mono">Span</dt><dd className="tabular">109 m</dd></div>
-              <div><dt className="mono">Mass</dt><dd className="tabular">420 t</dd></div>
+            <div className="chapter-meta mono"><b>02</b><span><i className="live-dot" aria-hidden /> ISS · live</span></div>
+            <h2>{iss?.over ? `Right now it’s over ${iss.over}.` : 'Seven people live up there.'}</h2>
+            <p>Crewed without a break since November 2000, circling the planet at 7.66 km every second.</p>
+            <dl className="readout">
+              <div><dt className="mono">Position</dt><dd className="tabular">{iss ? `${fmtLat(iss.lat)}  ${fmtLon(iss.lon)}` : '–'}</dd></div>
+              <div><dt className="mono">Altitude</dt><dd className="tabular">{iss ? `${Math.round(iss.alt)} km` : '–'}</dd></div>
             </dl>
+            <SeeIt pass={pass} observer={observer} locate={locate} locating={locating} error={locError} />
           </div>
         </section>
 
         <section className="chapter" data-align="right">
           <div className="chapter-copy" data-reveal>
             <div className="chapter-meta mono"><b>03</b><span>Orbit</span></div>
-            <h2>Sixteen sunrises a day.</h2>
-            <p>
-              At 7.66 km per second the station laps the planet every 92 minutes, so the crew sees a sunrise or a
-              sunset every 45. Scroll to ride along.
-            </p>
-            <dl className="spec">
-              <div><dt className="mono">Speed</dt><dd className="tabular">27,600 km/h</dd></div>
-              <div><dt className="mono">One orbit</dt><dd className="tabular">92 min</dd></div>
+            <h2>Sixteen sunsets a day.</h2>
+            <p>One lap of the planet takes 92 minutes, so the crew crosses into night every 46.</p>
+            <dl className="readout">
+              <div>
+                <dt className="mono">{shadow ? `Next ${shadow.kind} on board` : 'Next sunset on board'}</dt>
+                <dd className="tabular big">{shadow && now !== null ? countdown(shadow.at - now) : '–'}</dd>
+              </div>
             </dl>
           </div>
         </section>
@@ -199,12 +211,16 @@ export function StoryExperience() {
             <div className="chapter-meta mono"><b>04</b><span>Everything in orbit</span></div>
             <h2>It&rsquo;s getting crowded up there.</h2>
             <p>
-              Each dot is a real object, placed where it was when you opened this page. Most of the blue shell is Starlink,
-              launched in the last few years.
+              Every dot is a real object we track today
+              {counts?.broadband ? <>, and {Math.round((counts.broadband / counts.satellites) * 100)}% of them are broadband internet satellites, almost all launched in the last six years.</> : '.'}
             </p>
-            <dl className="spec">
-              <div><dt className="mono">Tracked objects</dt><dd className="tabular">{counts ? counts.satellites.toLocaleString('en-US') : '–'}</dd></div>
-              <div><dt className="mono">Launches queued</dt><dd className="tabular">{counts ? counts.launches : '–'}</dd></div>
+            <dl className="readout">
+              <div><dt className="mono">Tracked today</dt><dd className="tabular">{counts ? counts.satellites.toLocaleString('en-US') : '–'}</dd></div>
+              <div>
+                <dt className="mono">Next launch</dt>
+                <dd className="tabular">{nextLaunch && now !== null ? `in ${countdown(Date.parse(nextLaunch.net) - now)}` : '–'}</dd>
+                {nextLaunch && <Link className="readout-note mono" href="/launches/">{nextLaunch.rocket}{/unknown/i.test(nextLaunch.mission) ? '' : ` · ${nextLaunch.mission}`} →</Link>}
+              </div>
             </dl>
           </div>
         </section>
@@ -232,5 +248,47 @@ export function StoryExperience() {
         <div className="progress"><i ref={progress} /></div>
       </div>
     </>
+  );
+}
+
+const fmtLat = (v: number) => `${Math.abs(v).toFixed(1)}° ${v >= 0 ? 'N' : 'S'}`;
+const fmtLon = (v: number) => `${Math.abs(v).toFixed(1)}° ${v >= 0 ? 'E' : 'W'}`;
+
+/** When the reader can see the station from where they are, or a one-tap way to find out. */
+function SeeIt({
+  pass,
+  observer,
+  locate,
+  locating,
+  error,
+}: {
+  pass: Pass | null;
+  observer: Observer | null;
+  locate: () => void;
+  locating: boolean;
+  error: string | null;
+}) {
+  if (!observer) {
+    return (
+      <div className="see-it">
+        <button className="button" onClick={locate} disabled={locating}>
+          {locating ? 'Locating…' : 'When can I see it?'} <span aria-hidden>→</span>
+        </button>
+        {error && <p className="readout-note mono">{error}</p>}
+      </div>
+    );
+  }
+  if (!pass) return <p className="see-it readout-note mono">No passes over {observer.label ?? 'you'} in the next four days.</p>;
+  const day = pass.rise.toLocaleDateString(undefined, { weekday: 'short' });
+  const time = pass.rise.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const mins = Math.max(1, Math.round((pass.set.getTime() - pass.rise.getTime()) / 60000));
+  return (
+    <div className="see-it">
+      <p className="see-it-head mono">{pass.visible ? 'You can see it' : 'Next pass overhead'} · {observer.label ?? 'your location'}</p>
+      <p className="see-it-when">
+        {day} {time} <span>· {mins} min · {Math.round(pass.maxElevation)}° high, rises in the {compass(pass.riseAz)}</span>
+      </p>
+      <Link className="readout-note mono" href="/track/">All passes in the tracker →</Link>
+    </div>
   );
 }

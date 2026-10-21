@@ -26,7 +26,7 @@ type Chapter = {
 export const CHAPTERS: Chapter[] = [
   { id: 'orbit', label: 'Orbit' },
   { id: 'station', label: 'The ISS', labels: { a: 1, b: 1, c: 1 } },
-  { id: 'sunrise', label: '16 sunrises' },
+  { id: 'sunrise', label: '16 sunsets' },
   { id: 'everything', label: 'Everything' },
   { id: 'explore', label: 'Explore' },
 ];
