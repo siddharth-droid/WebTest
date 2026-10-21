@@ -1,5 +1,5 @@
 import { ecfToLookAngles, eciToEcf, gstime, propagate, type SatRec } from 'satellite.js';
-import { isSunlit, sunEci } from './astro';
+import { isSunlit, sunEci } from './sun';
 
 export interface Observer {
   lat: number;

@@ -103,6 +103,17 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* ------------------------------------------------------------------ canvas */
 .stage { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
 
+/* Landing: the pre-rendered sequence and the labels that ride on it */
+.sequence { display: block; width: 100%; height: 100%; background: #000; }
+.sequence-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
 /* ------------------------------------------------------------------ story */
 .story { position: relative; z-index: 2; }
 .chapter {
@@ -164,6 +175,45 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   font-variation-settings: 'wdth' 110;
 }
 
+/* Live readouts in the chapter copy */
+.readout {
+  margin-top: 32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--rule);
+}
+.readout div { padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.readout div:only-child { grid-column: 1 / -1; }
+.readout dt { color: var(--fg-3); }
+.readout dd {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 600;
+  font-variation-settings: 'wdth' 110;
+  white-space: pre;
+}
+.readout dd.big { font-size: clamp(34px, 3.4vw, 52px); font-weight: 700; letter-spacing: -0.01em; }
+.readout-note { display: inline-block; margin-top: 8px; color: var(--fg-3); transition: color 0.3s var(--ease-out); }
+a.readout-note:hover { color: var(--fg); }
+.chapter-meta span { display: inline-flex; align-items: center; gap: 8px; }
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal);
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes live-pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+.see-it { margin-top: 24px; }
+.see-it .button[disabled] { opacity: 0.6; cursor: progress; }
+.see-it-head { color: var(--signal); }
+.chapter .see-it-when { margin-top: 8px; font-size: 22px; font-weight: 650; color: var(--fg); }
+.chapter .see-it-head,
+.chapter .readout-note { margin-top: 8px; font-size: 11px; }
+.see-it-when span { font-size: 14px; font-weight: 400; color: var(--fg-2); }
+
 /* Hero */
 .hero { align-content: end; padding-bottom: 96px; }
 .hero-title {
@@ -176,7 +226,17 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   text-transform: uppercase;
 }
 .hero-title .line { display: block; overflow: hidden; padding-bottom: 0.04em; }
-.hero-title .line > span { display: inline-block; will-change: transform; }
+.hero-title .line > span { display: inline-block; white-space: nowrap; will-change: transform; }
+/* Keeps the hero copy legible where it sits over bright cloud */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 45% 0 0 0;
+  z-index: -1;
+  background: linear-gradient(transparent, rgb(2 4 10 / 0.8));
+  pointer-events: none;
+}
+.closing-actions .button[data-variant='ghost'] { text-shadow: 0 1px 10px rgb(2 4 10 / 0.9), 0 0 2px rgb(2 4 10 / 0.9); }
 /* Tight display tracking pulls the full stop into the preceding letter; give it its own air */
 .hero-title .punct { display: inline-block; margin-left: 0.07em; letter-spacing: 0; }
 .hero-foot {
@@ -237,32 +297,18 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .story-hud .progress { justify-self: end; width: 160px; height: 1px; background: var(--rule); }
 .story-hud .progress > i { display: block; height: 100%; background: var(--fg); transform-origin: left; transform: scaleX(0); }
 
-/* Mirrored label for hotspots that sit on the right edge of the craft */
-.hotspot[data-side='left'] .hotspot-leader { left: auto; right: 7px; transform-origin: right; transform: rotate(32deg); }
-.hotspot[data-side='left'] .hotspot-copy {
-  left: auto;
-  right: 54px;
-  padding: 0 10px 0 0;
-  border-left: 0;
-  border-right: 1px solid var(--rule-strong);
-  text-align: right;
-}
-
-/* Leaders that point downward, for labels that would otherwise stack */
-.hotspot[data-v='down'] .hotspot-leader { transform: rotate(32deg); }
-.hotspot[data-v='down'] .hotspot-copy { top: 20px; }
-.hotspot[data-side='left'][data-v='down'] .hotspot-leader { transform: rotate(-32deg); }
-
-/* Hotspots (drei <Html>) */
-.hotspot { position: relative; width: 0; height: 0; transition: none; }
+/* Hotspot labels: a marker on the part, a leader out to the side, and the
+   text on a solid card so it stays legible over the bright station */
+.hotspot { position: relative; width: 0; height: 0; --reach: 96px; }
 .hotspot-ring {
   position: absolute;
-  left: -7px;
-  top: -7px;
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--fg);
+  left: -8px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--fg);
   border-radius: 50%;
+  box-shadow: 0 0 0 3px rgb(2 4 10 / 0.55), inset 0 0 0 3px rgb(2 4 10 / 0.55);
 }
 .hotspot-ring::after {
   content: '';
@@ -273,37 +319,60 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 .hotspot-leader {
   position: absolute;
-  left: 7px;
+  left: 8px;
   top: 0;
-  width: 56px;
-  height: 1px;
-  background: var(--rule-strong);
+  width: var(--reach);
+  height: 1.5px;
+  background: var(--fg);
+  box-shadow: 0 0 0 1px rgb(2 4 10 / 0.45);
   transform-origin: left;
-  transform: rotate(-32deg);
+  transform: rotate(-34deg);
 }
 .hotspot-copy {
   position: absolute;
-  left: 54px;
-  top: -52px;
+  left: calc(var(--reach) * 0.83 + 8px);
+  top: calc(var(--reach) * -0.56 - 46px);
   display: grid;
   gap: 4px;
   white-space: nowrap;
-  padding-left: 10px;
-  border-left: 1px solid var(--rule-strong);
+  padding: 9px 14px 10px;
+  background: rgb(2 4 10 / 0.86);
+  border-left: 2px solid var(--signal);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
 }
 .hotspot-copy strong {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
-  font-variation-settings: 'wdth' 115;
+  font-variation-settings: 'wdth' 112;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 .hotspot-copy span {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--fg-2);
+}
+
+/* Mirrored: leader and card to the left of the marker */
+.hotspot[data-side='left'] .hotspot-leader { left: auto; right: 8px; transform-origin: right; transform: rotate(34deg); }
+.hotspot[data-side='left'] .hotspot-copy {
+  left: auto;
+  right: calc(var(--reach) * 0.83 + 8px);
+  border-left: 0;
+  border-right: 2px solid var(--signal);
+  text-align: right;
+}
+/* Pointing down, for labels that would otherwise stack */
+.hotspot[data-v='down'] .hotspot-leader { transform: rotate(34deg); }
+.hotspot[data-v='down'] .hotspot-copy { top: calc(var(--reach) * 0.56 - 6px); }
+.hotspot[data-side='left'][data-v='down'] .hotspot-leader { transform: rotate(-34deg); }
+
+@media (max-width: 900px) {
+  .hotspot { --reach: 54px; }
+  .hotspot-copy strong { font-size: 13px; }
+  .hotspot-copy span { display: none; }
 }
 
 /* ------------------------------------------------------------------ console */
@@ -479,7 +548,26 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .inspector:has(.inspector-empty) { display: none; }
   .console .inspector { max-height: 46svh; }
   .console .timebar { grid-row: 3; }
-  .site-nav { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 120px); }
+  .site-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: calc(100vw - 120px);
+    /* Fade the edge so it is clear the nav scrolls */
+    mask-image: linear-gradient(to right, #000 82%, transparent);
+  }
+  /* Landing on phones: copy sits on a dark panel over the imagery, and the station
+     labels give way to the text */
+  .sequence-label { display: none; }
+  .chapter-copy::before,
+  .closing-inner::before {
+    content: '';
+    position: absolute;
+    inset: -28px calc(var(--gutter) * -1);
+    z-index: -1;
+    background: linear-gradient(rgb(2 4 10 / 0), rgb(2 4 10 / 0.78) 18%, rgb(2 4 10 / 0.78) 82%, rgb(2 4 10 / 0));
+    pointer-events: none;
+  }
+  .closing-inner { position: relative; }
   .site-nav a { padding: 8px 8px; white-space: nowrap; }
   .inspector { grid-column: 1; grid-row: 2; align-self: end; max-height: 46svh; overflow-y: auto; }
   .track { display: none; }
