@@ -233,7 +233,8 @@ a.readout-note:hover { color: var(--fg); }
   position: absolute;
   inset: 45% 0 0 0;
   z-index: -1;
-  background: linear-gradient(transparent, rgb(2 4 10 / 0.8));
+  /* Fades out again at the bottom, so no hard edge shows as the hero scrolls away */
+  background: linear-gradient(transparent, rgb(2 4 10 / 0.8) 60%, rgb(2 4 10 / 0.8) 80%, transparent);
   pointer-events: none;
 }
 .closing-actions .button[data-variant='ghost'] { text-shadow: 0 1px 10px rgb(2 4 10 / 0.9), 0 0 2px rgb(2 4 10 / 0.9); }
