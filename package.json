@@ -18,10 +18,7 @@
   "homepage": "https://github.com/siddharth-droid/WebTest#readme",
   "dependencies": {
     "@fontsource-variable/archivo": "^5.2.6",
-    "@fontsource/anton": "^5.3.0",
-    "@fontsource/instrument-serif": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.2.6",
-    "@fontsource/space-mono": "^5.3.0",
     "@gsap/react": "^2.1.2",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",

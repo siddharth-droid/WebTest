@@ -4,19 +4,18 @@ import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { story } from '@/lib/story';
+import { Earth } from './Earth';
 import { Satellite } from './Satellite';
+import { SpaceLighting } from './SpaceLighting';
 import { RealConstellation } from './RealConstellation';
-import { RetroEarth } from '@/components/retro/RetroEarth';
-import { RetroStars, RetroSun } from '@/components/retro/RetroSky';
-import { RetroEffects } from '@/components/retro/RetroEffect';
-import { PALETTE } from '@/components/retro/palette';
+import { GlobeAtmosphere, GlobeEffects } from '@/components/globe/Globe';
 
 const EARTH_R = 6;
 /** ISS altitude, 420 km, in scene units. */
 const ORBIT_R = EARTH_R * (1 + 420 / 6371);
 const INCLINATION = THREE.MathUtils.degToRad(51.6);
-/** The station is drawn ~700× life size so it reads at this scale. */
-const ISS_SIZE = 0.13;
+/** The station is drawn ~1000× life size so it reads at this scale. */
+const ISS_SIZE = 0.17;
 
 // Orbit plane basis: P(u) = r (cos u · E1 + sin u · E2)
 const E1 = new THREE.Vector3(1, 0, 0);
@@ -117,38 +116,33 @@ function Rig({ station }: { station: React.RefObject<THREE.Group | null> }) {
   return null;
 }
 
-/**
- * The landing scene, styled as a 1970s anime cel: flat-shaded planet and
- * station with ink outlines, a poster sun, sparkle stars and a film finish.
- * Deliberately light: no physical atmosphere, no shadow maps, one post pass.
- */
 export default function StoryScene() {
+  const earth = useRef<THREE.Group>(null);
   const station = useRef<THREE.Group>(null);
   const sun = useMemo(() => SUN.clone(), []);
 
   return (
     <div className="stage">
       <Canvas
+        shadows
         flat
-        dpr={[1, 1.5]}
+        dpr={[1, 2]}
         gl={{ antialias: false, powerPreference: 'high-performance' }}
         camera={{ fov: 32, near: 0.005, far: 4000, position: [0, 2, 30] }}
       >
-        <color attach="background" args={[PALETTE.ink]} />
+        <color attach="background" args={['#000000']} />
         <Rig station={station} />
-        <hemisphereLight args={[PALETTE.cream, PALETTE.navy, 0.9]} />
-        <RetroStars />
-        <RetroSun sun={sun} />
         <Suspense fallback={null}>
-          <RetroEarth radius={EARTH_R} sun={sun} spin={(t) => t * 0.002} />
-          <RealConstellation earthRadius={EARTH_R} brightness={1.1} opacity={() => story.constellation} />
+          <GlobeAtmosphere earth={earth} radius={EARTH_R} sun={sun} mode="fixed">
+            <SpaceLighting sun={sun} directional={false} />
+            <Earth ref={earth} radius={EARTH_R} sun={sun} spin={(t) => t * 0.002} />
+            <RealConstellation earthRadius={EARTH_R} opacity={() => story.constellation} />
+            <group ref={station}>
+              <Satellite model="issHd" size={ISS_SIZE} hotspots float={false} sun={sun} shadows reflections />
+            </group>
+            <GlobeEffects bloom={0.55} />
+          </GlobeAtmosphere>
         </Suspense>
-        <group ref={station}>
-          <Suspense fallback={null}>
-            <Satellite model="issHd" size={ISS_SIZE} hotspots float={false} sun={sun} toon />
-          </Suspense>
-        </group>
-        <RetroEffects />
       </Canvas>
     </div>
   );

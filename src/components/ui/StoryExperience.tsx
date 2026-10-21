@@ -8,7 +8,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { ReactLenis, useLenis, type LenisRef } from 'lenis/react';
 import { CHAPTERS, story } from '@/lib/story';
-import { TitleSequence } from '@/components/retro/TitleSequence';
+import { Loader } from './Loader';
 import { useData } from '@/lib/data';
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
@@ -100,16 +100,14 @@ export function StoryExperience() {
     { scope: root },
   );
 
-  // Intro: fly in from deep space once the titles are done and the assets are on the GPU
+  // Intro: fly in from deep space once the assets are on the GPU
   const playIntro = useCallback(() => {
     setReady(true);
     gsap
       .timeline()
       .to(story, { intro: 0, duration: 3.2, ease: 'expo.out' }, 0)
-      .from('.hero-title .line > span', { yPercent: 110, duration: 1.1, stagger: 0.12, ease: 'expo.out' }, 0.3)
-      .from('.hero-sub', { opacity: 0, x: -16, duration: 0.9, ease: 'power3.out' }, 0.9)
+      .from('.hero-title .line > span', { yPercent: 110, duration: 1.4, stagger: 0.1, ease: 'expo.out' }, 0.5)
       .from('.hero-foot > *', { opacity: 0, y: 12, duration: 1, stagger: 0.08, ease: 'power3.out' }, 1.1)
-      .from('.patch', { scale: 0.6, opacity: 0, rotate: -40, duration: 1.2, ease: 'back.out(1.6)' }, 1.2)
       .from('.site-header, .story-hud', { opacity: 0, duration: 1.2 }, 1.2);
   }, []);
 
@@ -119,30 +117,29 @@ export function StoryExperience() {
   }, []);
 
   return (
-    <div className="retro">
+    <>
       <SmoothScroll />
-      <TitleSequence onDone={playIntro} />
+      <Loader onDone={playIntro} />
       <StoryScene />
 
       <div ref={root} className="story" style={{ visibility: ready ? 'visible' : 'hidden' }}>
         <section className="chapter hero">
-          <p className="hero-sub">a live broadcast from low Earth orbit</p>
           <h1 className="hero-title">
             <span className="line"><span>Every satellite<span className="punct">.</span></span></span>
             <span className="line"><span>Right now<span className="punct">.</span></span></span>
           </h1>
           <div className="hero-foot">
             <p>
-              Everything humanity has in orbit, tracked live and built entirely on open data from CelesTrak, NASA and NOAA.
+              A live view of everything humanity has in orbit, built entirely on open data from CelesTrak, NASA and NOAA.
             </p>
-            <span className="mono tabular">{counts ? `${counts.satellites.toLocaleString('en-US')} objects on the air` : 'On the air'}</span>
-            <span className="mono">Scroll to tune in ↓</span>
+            <span className="mono tabular">{counts ? `${counts.satellites.toLocaleString('en-US')} objects tracked today` : 'Tracking live'}</span>
+            <span className="mono">Scroll to explore</span>
           </div>
-          <MissionPatch />
         </section>
 
         <section className="chapter" data-align="left">
-          <Session n={2} title="Football Field Blues">
+          <div className="chapter-copy" data-reveal>
+            <div className="chapter-meta mono"><b>02</b><span>International Space Station</span></div>
             <h2>A football field, 420 km up.</h2>
             <p>
               Sixteen pressurised modules from five space agencies, continuously crewed since November 2000. This is
@@ -152,11 +149,12 @@ export function StoryExperience() {
               <div><dt className="mono">Span</dt><dd className="tabular">109 m</dd></div>
               <div><dt className="mono">Mass</dt><dd className="tabular">420 t</dd></div>
             </dl>
-          </Session>
+          </div>
         </section>
 
         <section className="chapter" data-align="right">
-          <Session n={3} title="Sunrise Waltz">
+          <div className="chapter-copy" data-reveal>
+            <div className="chapter-meta mono"><b>03</b><span>Orbit</span></div>
             <h2>Sixteen sunrises a day.</h2>
             <p>
               At 7.66 km per second the station laps the planet every 92 minutes, so the crew sees a sunrise or a
@@ -166,28 +164,28 @@ export function StoryExperience() {
               <div><dt className="mono">Speed</dt><dd className="tabular">27,600 km/h</dd></div>
               <div><dt className="mono">One orbit</dt><dd className="tabular">92 min</dd></div>
             </dl>
-          </Session>
+          </div>
         </section>
 
         <section className="chapter" data-align="right">
-          <Session n={4} title="Crowded Sky Rhapsody">
+          <div className="chapter-copy" data-reveal>
+            <div className="chapter-meta mono"><b>04</b><span>Everything in orbit</span></div>
             <h2>It&rsquo;s getting crowded up there.</h2>
             <p>
-              Each dot is a real object, placed where it was when you opened this page. Most of the shell is Starlink,
+              Each dot is a real object, placed where it was when you opened this page. Most of the blue shell is Starlink,
               launched in the last few years.
             </p>
             <dl className="spec">
               <div><dt className="mono">Tracked objects</dt><dd className="tabular">{counts ? counts.satellites.toLocaleString('en-US') : '–'}</dd></div>
               <div><dt className="mono">Launches queued</dt><dd className="tabular">{counts ? counts.launches : '–'}</dd></div>
             </dl>
-          </Session>
+          </div>
         </section>
 
         <section className="chapter closing">
           <div className="closing-inner" data-reveal>
-            <p className="session-tag mono">Session #05 · Final</p>
-            <h2>Look up<span className="punct">.</span></h2>
-            <p className="signoff">See you out there, space cowboy&hellip;</p>
+            <div className="chapter-meta mono"><b>05</b><span>Explore</span></div>
+            <h2>Look up.</h2>
             <div className="closing-actions mono">
               <Link className="button" href="/track/">Open the live tracker <span aria-hidden>→</span></Link>
               <Link className="button" data-variant="ghost" href="/launches/">Launch schedule</Link>
@@ -198,7 +196,7 @@ export function StoryExperience() {
       </div>
 
       <div className="story-hud mono">
-        <span className="tabular">Session {String(active + 1).padStart(2, '0')} / {String(CHAPTERS.length).padStart(2, '0')}</span>
+        <span className="tabular">{String(active + 1).padStart(2, '0')} / {String(CHAPTERS.length).padStart(2, '0')}</span>
         <ol>
           {CHAPTERS.map((c, i) => (
             <li key={c.id} data-active={i === active}>{c.label}</li>
@@ -206,40 +204,6 @@ export function StoryExperience() {
         </ol>
         <div className="progress"><i ref={progress} /></div>
       </div>
-    </div>
-  );
-}
-
-/** An episode card: session number and a jazz-standard title over the chapter copy. */
-function Session({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
-  return (
-    <div className="chapter-copy session-card" data-reveal>
-      <div className="session-head">
-        <span className="session-tag mono">Session #{String(n).padStart(2, '0')}</span>
-        <span className="session-title">{title}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-/** A mission patch with its motto running round the rim. */
-function MissionPatch() {
-  return (
-    <svg className="patch" viewBox="0 0 200 200" aria-hidden>
-      <defs>
-        <path id="patch-rim" d="M100,100 m-74,0 a74,74 0 1,1 148,0 a74,74 0 1,1 -148,0" />
-      </defs>
-      <circle cx="100" cy="100" r="96" className="patch-ring" />
-      <circle cx="100" cy="100" r="54" className="patch-core" />
-      <g className="patch-spin">
-        <text className="patch-text">
-          <textPath href="#patch-rim">Orbita · open data · live from orbit · est. 2026 ·</textPath>
-        </text>
-      </g>
-      <circle cx="100" cy="100" r="22" className="patch-sun" />
-      <path d="M58 112 Q100 76 142 112" className="patch-orbit" />
-      <circle cx="132" cy="103" r="5" className="patch-sat" />
-    </svg>
+    </>
   );
 }

@@ -22,8 +22,8 @@ interface Hotspot {
   key: HotspotKey;
   /** Material names of the parts the label points at. */
   parts: RegExp;
-  /** Where on those parts: their centre, or this fraction of the way along their longest axis. */
-  along?: number;
+  /** Where on those parts: their centre, or the far end along the model's longest axis. */
+  anchor?: 'center' | 'end';
   title: string;
   detail: string;
   side: 'left' | 'right';
@@ -33,7 +33,7 @@ interface Hotspot {
 
 const HOTSPOTS: Partial<Record<ModelId, Hotspot[]>> = {
   issHd: [
-    { key: 'a', parts: /^IROSA/, along: 0.08, title: 'Solar arrays', detail: 'Turn to track the Sun', side: 'right', v: 'up' },
+    { key: 'a', parts: /^IROSA/, anchor: 'end', title: 'Solar arrays', detail: 'Turn to track the Sun', side: 'right', v: 'up' },
     { key: 'b', parts: /^Node\.Cupola/, title: 'Cupola', detail: 'Seven-window observatory', side: 'right', v: 'down' },
     { key: 'c', parts: /^JEM_PM$/, title: 'Kibō', detail: 'Japan’s laboratory module', side: 'left', v: 'up' },
   ],
@@ -63,34 +63,6 @@ interface SatelliteProps {
   sun?: THREE.Vector3;
   /** Reflect the real surroundings (Earth, sky) via a live cube camera. */
   reflections?: boolean;
-  /** Flat cel shading (the retro landing) instead of physically based metals. */
-  toon?: boolean;
-}
-
-/** Three hard tones: shadow, mid, light. */
-let toonRamp: THREE.DataTexture | null = null;
-function ramp() {
-  if (toonRamp) return toonRamp;
-  toonRamp = new THREE.DataTexture(new Uint8Array([70, 70, 70, 255, 165, 165, 165, 255, 255, 255, 255, 255]), 3, 1);
-  toonRamp.minFilter = toonRamp.magFilter = THREE.NearestFilter;
-  toonRamp.needsUpdate = true;
-  return toonRamp;
-}
-
-/** Keep the artist's colour and texture, drop the physics: a painted cel. */
-function toonMaterial(src: THREE.Material) {
-  const m = src as THREE.MeshStandardMaterial;
-  const panels = /SolarPanel|IROSA/i.test(m.name);
-  const out = new THREE.MeshToonMaterial({
-    name: m.name,
-    color: panels ? new THREE.Color('#b9772c') : m.color,
-    map: panels ? null : m.map,
-    gradientMap: ramp(),
-    side: panels ? THREE.DoubleSide : m.side,
-    transparent: m.transparent,
-    opacity: m.opacity,
-  });
-  return out;
 }
 
 export function Satellite({
@@ -101,7 +73,6 @@ export function Satellite({
   shadows = false,
   sun,
   reflections = false,
-  toon = false,
 }: SatelliteProps) {
   const { scene } = useGLTF(MODELS[modelId]);
   const floatRef = useRef<THREE.Group>(null);
@@ -112,8 +83,7 @@ export function Satellite({
     const wings = modelId === 'issHd' ? buildWings(model) : [];
     model.traverse((o) => {
       if (o instanceof THREE.Mesh) {
-        const upgrade = toon ? toonMaterial : upgradeMaterial;
-        o.material = Array.isArray(o.material) ? o.material.map(upgrade) : upgrade(o.material);
+        o.material = Array.isArray(o.material) ? o.material.map(upgradeMaterial) : upgradeMaterial(o.material);
         // Ambient occlusion baked into vertex colours in Blender (scripts/blender/*.py)
         if (o.geometry.attributes.color) {
           for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.vertexColors = true;
@@ -150,16 +120,17 @@ export function Satellite({
         continue;
       }
       const at = box.getCenter(new THREE.Vector3());
-      if (h.along !== undefined) {
+      if (h.anchor === 'end') {
+        // Along the longest axis of the parts, 85% of the way to the far end
         const d = box.getSize(new THREE.Vector3());
         const axis = d.x >= d.y && d.x >= d.z ? 'x' : d.y >= d.z ? 'y' : 'z';
-        at[axis] = box.min[axis] + d[axis] * h.along;
+        at[axis] = box.min[axis] + d[axis] * 0.92;
       }
       anchors.set(h.key, at);
     }
 
     return { model, offset: center.clone().negate(), scale: size / Math.max(dims.x, dims.y, dims.z), anchors, wings };
-  }, [scene, size, modelId, shadows, toon]);
+  }, [scene, size, modelId, shadows]);
 
   // --- Live reflections: capture the surroundings from the craft's position every ~20 frames
   const gl = useThree((s) => s.gl);
@@ -216,7 +187,7 @@ export function Satellite({
       {sun && (
         <directionalLight
           ref={light}
-          intensity={toon ? 2.4 : 11 * RADIANCE}
+          intensity={11 * RADIANCE}
           color="#fff4e6"
           castShadow={shadows}
           shadow-mapSize={[2048, 2048]}
