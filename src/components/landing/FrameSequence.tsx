@@ -61,13 +61,16 @@ export function FrameSequence({ onProgress }: { onProgress?: (loaded: number) =>
 
     // Smaller frames for small or data-saving screens
     const saveData = (navigator as { connection?: { saveData?: boolean } }).connection?.saveData;
-    const width = !saveData && window.innerWidth * Math.min(window.devicePixelRatio, 2) > 1100 ? 1440 : 960;
+    const need = window.innerWidth * Math.min(window.devicePixelRatio || 1, 2);
+    const width = saveData ? 960 : need > 1700 ? 2560 : need > 1000 ? 1600 : 960;
     const dir = asset(`/landing/${width}/`);
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       el.width = Math.round(el.clientWidth * dpr);
       el.height = Math.round(el.clientHeight * dpr);
+      // Resizing resets the context, so set smoothing each time
+      ctx.imageSmoothingQuality = 'high';
       dirty = true;
     };
     resize();
