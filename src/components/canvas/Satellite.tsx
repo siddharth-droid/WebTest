@@ -22,8 +22,8 @@ interface Hotspot {
   key: HotspotKey;
   /** Material names of the parts the label points at. */
   parts: RegExp;
-  /** Where on those parts: their centre, or this fraction of the way along their longest axis. */
-  along?: number;
+  /** Where on those parts: their centre, or the far end along the model's longest axis. */
+  anchor?: 'center' | 'end';
   title: string;
   detail: string;
   side: 'left' | 'right';
@@ -33,7 +33,7 @@ interface Hotspot {
 
 const HOTSPOTS: Partial<Record<ModelId, Hotspot[]>> = {
   issHd: [
-    { key: 'a', parts: /^IROSA/, along: 0.08, title: 'Solar arrays', detail: 'Turn to track the Sun', side: 'right', v: 'up' },
+    { key: 'a', parts: /^IROSA/, anchor: 'end', title: 'Solar arrays', detail: 'Turn to track the Sun', side: 'right', v: 'up' },
     { key: 'b', parts: /^Node\.Cupola/, title: 'Cupola', detail: 'Seven-window observatory', side: 'right', v: 'down' },
     { key: 'c', parts: /^JEM_PM$/, title: 'Kibō', detail: 'Japan’s laboratory module', side: 'left', v: 'up' },
   ],
@@ -61,10 +61,8 @@ interface SatelliteProps {
    * sun light (with shadows if enabled) and the ISS turns its wings to face it.
    */
   sun?: THREE.Vector3;
-  /** Reflect the orbital surroundings (Earth below, the Sun) in metal surfaces. */
+  /** Reflect the real surroundings (Earth, sky) via a live cube camera. */
   reflections?: boolean;
-  /** 0–1 multiplier on sunlight, e.g. 0 while the craft is in Earth's shadow. */
-  illumination?: () => number;
 }
 
 export function Satellite({
@@ -75,7 +73,6 @@ export function Satellite({
   shadows = false,
   sun,
   reflections = false,
-  illumination,
 }: SatelliteProps) {
   const { scene } = useGLTF(MODELS[modelId]);
   const floatRef = useRef<THREE.Group>(null);
@@ -123,10 +120,11 @@ export function Satellite({
         continue;
       }
       const at = box.getCenter(new THREE.Vector3());
-      if (h.along !== undefined) {
+      if (h.anchor === 'end') {
+        // Along the longest axis of the parts, 85% of the way to the far end
         const d = box.getSize(new THREE.Vector3());
         const axis = d.x >= d.y && d.x >= d.z ? 'x' : d.y >= d.z ? 'y' : 'z';
-        at[axis] = box.min[axis] + d[axis] * h.along;
+        at[axis] = box.min[axis] + d[axis] * 0.92;
       }
       anchors.set(h.key, at);
     }
@@ -134,25 +132,28 @@ export function Satellite({
     return { model, offset: center.clone().negate(), scale: size / Math.max(dims.x, dims.y, dims.z), anchors, wings };
   }, [scene, size, modelId, shadows]);
 
-  // --- Reflections: what a craft in low orbit sees around it (the bright Earth filling the
-  // lower sky, black space above, the Sun) painted into a tiny cube map. Far cheaper than
-  // capturing the real scene, and metal still picks up the blue planet and the Sun's glint.
+  // --- Live reflections: capture the surroundings from the craft's position every ~20 frames
   const gl = useThree((s) => s.gl);
-  const env = useMemo(() => (reflections ? createOrbitEnvironment() : null), [reflections]);
+  const scene3 = useThree((s) => s.scene);
+  const cube = useMemo(() => {
+    if (!reflections) return null;
+    const rt = new THREE.WebGLCubeRenderTarget(128, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+    return { rt, cam: new THREE.CubeCamera(size * 0.6, 5000, rt) };
+  }, [reflections, size]);
   useEffect(() => {
-    if (!env) return;
+    if (!cube) return;
     model.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
         if (m instanceof THREE.MeshStandardMaterial) {
-          m.envMap = env.rt.texture;
+          m.envMap = cube.rt.texture;
           m.envMapIntensity = 1;
           m.needsUpdate = true;
         }
       }
     });
-    return () => env.dispose();
-  }, [env, model]);
+    return () => cube.rt.dispose();
+  }, [cube, model]);
 
   // --- Own sun light: tight shadow frustum around the craft
   const light = useRef<THREE.DirectionalLight>(null);
@@ -166,12 +167,13 @@ export function Satellite({
       root.parent?.getWorldQuaternion(local.q);
       local.v.copy(sun).applyQuaternion(local.q.invert());
       light.current?.position.copy(local.v).multiplyScalar(size * 3);
-      if (light.current) light.current.intensity = 11 * RADIANCE * (illumination ? illumination() : 1);
       updateWings(wings, model, sun, dt);
     }
-    if (env && root && sun && frame.current++ % 30 === 0) {
-      root.getWorldPosition(local.v);
-      env.update(gl, local.v, sun, illumination ? illumination() : 1);
+    if (cube && root && frame.current++ % 20 === 0) {
+      root.visible = false;
+      root.getWorldPosition(cube.cam.position);
+      cube.cam.update(gl, scene3);
+      root.visible = true;
     }
     if (!float || !root) return;
     const t = state.clock.elapsedTime;
@@ -231,70 +233,4 @@ function HotspotLabel({ spot, position }: { spot: Hotspot; position: THREE.Vecto
       </div>
     </Html>
   );
-}
-
-const envVertex = /* glsl */ `
-varying vec3 vDir;
-void main() {
-  vDir = position;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-const envFragment = /* glsl */ `
-uniform vec3 uDown;
-uniform vec3 uSun;
-uniform float uHorizon;
-uniform float uLight;
-varying vec3 vDir;
-void main() {
-  vec3 d = normalize(vDir);
-  float below = dot(d, uDown);
-  float earth = smoothstep(uHorizon - 0.03, uHorizon + 0.03, below);
-  // Day side under a high sun is bright blue-white; the limb carries a thin blue band
-  float day = clamp(dot(-uDown, uSun) * 0.8 + 0.35, 0.0, 1.0) * uLight;
-  vec3 ground = mix(vec3(0.05, 0.09, 0.16), vec3(0.16, 0.22, 0.32), day) * day;
-  vec3 limb = vec3(0.12, 0.3, 0.8) * exp(-abs(below - uHorizon) * 40.0) * day;
-  vec3 sun = vec3(1.0, 0.95, 0.88) * pow(max(dot(d, uSun), 0.0), 600.0) * 24.0 * uLight;
-  gl_FragColor = vec4(ground * earth + limb + sun, 1.0);
-}
-`;
-
-/** A 32 px cube map of the orbital surroundings, redrawn as the craft moves. */
-function createOrbitEnvironment() {
-  const rt = new THREE.WebGLCubeRenderTarget(32, {
-    type: THREE.HalfFloatType,
-    generateMipmaps: true,
-    minFilter: THREE.LinearMipmapLinearFilter,
-  });
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uDown: { value: new THREE.Vector3(0, -1, 0) },
-      uSun: { value: new THREE.Vector3(1, 0, 0) },
-      // cos of the Earth's angular radius from 420 km up (≈ 70°)
-      uHorizon: { value: Math.cos(Math.asin(6371 / 6791)) },
-      uLight: { value: 1 },
-    },
-    vertexShader: envVertex,
-    fragmentShader: envFragment,
-    side: THREE.BackSide,
-    depthWrite: false,
-  });
-  const scene = new THREE.Scene();
-  const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), material);
-  scene.add(sphere);
-  const camera = new THREE.CubeCamera(0.1, 10, rt);
-  return {
-    rt,
-    update(gl: THREE.WebGLRenderer, position: THREE.Vector3, sun: THREE.Vector3, light: number) {
-      material.uniforms.uDown.value.copy(position).negate().normalize();
-      material.uniforms.uSun.value.copy(sun);
-      material.uniforms.uLight.value = light;
-      camera.update(gl, scene);
-    },
-    dispose() {
-      rt.dispose();
-      material.dispose();
-      sphere.geometry.dispose();
-    },
-  };
 }

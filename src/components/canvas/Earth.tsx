@@ -2,20 +2,18 @@
 
 import { forwardRef, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { suspend } from 'suspend-react';
+import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { limbFragment, limbVertex, surfaceFragment, surfaceVertex } from '@/lib/shaders/earth';
 import { asset } from '@/lib/asset';
-import { getTier, useTier } from '@/lib/quality';
 import { RADIANCE } from '@/components/globe/units';
 
-/** Bundled 4K set (NASA imagery via the three.js examples), used if the CI-built set is missing. */
+/** Bundled 4K set (NASA imagery via the three.js examples); always available. */
 const BASE = {
   day: asset('/textures/earth_day_4096.jpg'),
   night: asset('/textures/earth_night_4096.jpg'),
   brc: asset('/textures/earth_bump_roughness_clouds_4096.jpg'),
 };
-const DIR = asset('/textures/earth/');
 
 interface TextureManifest {
   day: string | null;
@@ -33,74 +31,14 @@ interface EarthProps {
   children?: React.ReactNode;
 }
 
-/**
- * Decode images off the main thread where the browser can (createImageBitmap),
- * so a large texture never freezes scrolling while it unpacks.
- */
-const bitmaps = typeof createImageBitmap !== 'undefined';
-const bitmapLoader = new THREE.ImageBitmapLoader().setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none' });
-const imageLoader = new THREE.TextureLoader();
-async function load(url: string, srgb: boolean) {
-  let t: THREE.Texture;
-  if (bitmaps) {
-    t = new THREE.Texture(await bitmapLoader.loadAsync(url));
-    t.flipY = false;
-    t.needsUpdate = true;
-  } else {
-    t = await imageLoader.loadAsync(url);
-  }
-  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-  t.anisotropy = 8;
-  t.wrapS = THREE.RepeatWrapping;
-  return t;
-}
-
-interface Maps {
-  day: THREE.Texture;
-  night: THREE.Texture;
-  clouds: THREE.Texture;
-  relief: THREE.Texture | null;
-  /** Land/ocean mask in G; the legacy set packs clouds into B of the same map. */
-  water: THREE.Texture;
-  legacy: boolean;
-  manifest: TextureManifest | null;
-}
-
-/** The CI-built 2K set (small, so the planet appears fast); the 4K bundled set otherwise. */
-async function loadMaps(): Promise<Maps> {
-  const res = await fetch(asset('/textures/earth/manifest.json')).catch(() => null);
-  const m = res?.ok ? ((await res.json()) as TextureManifest) : null;
-  const brc = await load(BASE.brc, false);
-  if (m?.day && m.night && m.clouds) {
-    const [day, night, clouds, relief] = await Promise.all([
-      load(`${DIR}${m.day}-2k.jpg`, true),
-      load(`${DIR}night-2k.jpg`, true),
-      load(`${DIR}clouds-2k.jpg`, false),
-      m.relief ? load(`${DIR}${m.relief}`, false).catch(() => null) : Promise.resolve(null),
-    ]);
-    return { day, night, clouds, relief, water: brc, legacy: false, manifest: m };
-  }
-  const [day, night] = await Promise.all([load(BASE.day, true), load(BASE.night, true)]);
-  return { day, night, clouds: brc, relief: null, water: brc, legacy: true, manifest: null };
-}
-
-/** Run once the reader has stopped scrolling for a moment, so a big upload never lands mid-gesture. */
-function whenIdle(fn: () => void) {
-  let timer = 0;
-  const arm = () => {
-    clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      window.removeEventListener('scroll', arm);
-      if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout: 2000 });
-      else fn();
-    }, 1200);
-  };
-  window.addEventListener('scroll', arm, { passive: true });
-  arm();
-  return () => {
-    clearTimeout(timer);
-    window.removeEventListener('scroll', arm);
-  };
+const loader = new THREE.TextureLoader();
+function load(url: string, srgb: boolean) {
+  return loader.loadAsync(url).then((t) => {
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.anisotropy = 8;
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+  });
 }
 
 /**
@@ -112,66 +50,63 @@ function whenIdle(fn: () => void) {
 export const Earth = forwardRef<THREE.Group, EarthProps>(function Earth({ radius, sun, spin, children }, ref) {
   const spinRef = useRef<THREE.Group>(null);
   const gl = useThree((s) => s.gl);
-  const tier = useTier();
-  const maps = suspend(loadMaps, ['earth-maps']);
+  const base = useTexture(BASE);
 
-  const uniforms = useMemo(
-    () => ({
-      uDay: { value: maps.day },
-      uNight: { value: maps.night },
-      uClouds: { value: maps.clouds },
-      uCloudsChannel: { value: maps.legacy ? 1 : 0 },
-      uRelief: { value: maps.relief ?? maps.water },
-      uHasRelief: { value: maps.relief ? 1 : 0 },
-      uWater: { value: maps.water },
+  const uniforms = useMemo(() => {
+    base.day.colorSpace = THREE.SRGBColorSpace;
+    base.night.colorSpace = THREE.SRGBColorSpace;
+    for (const t of Object.values(base)) {
+      t.anisotropy = 8;
+      t.wrapS = THREE.RepeatWrapping;
+    }
+    return {
+      uDay: { value: base.day as THREE.Texture },
+      uNight: { value: base.night as THREE.Texture },
+      uClouds: { value: base.brc as THREE.Texture },
+      uCloudsChannel: { value: 1 },
+      uRelief: { value: base.brc as THREE.Texture },
+      uHasRelief: { value: 0 },
+      uWater: { value: base.brc as THREE.Texture },
       uSun: { value: sun },
       uIntensity: { value: RADIANCE },
       uCloudOffset: { value: 0 },
-      uDetail: { value: getTier() === 'low' ? 0 : 1 },
-    }),
-    [maps, sun],
-  );
-  useEffect(() => {
-    uniforms.uDetail.value = tier === 'low' ? 0 : 1;
-  }, [tier, uniforms]);
+    };
+  }, [base, sun]);
 
-  // High tier: swap in the 8K set once the reader pauses, one texture at a time
+  // Upgrade to the CI-built set: 2K first (fast), then 8K where the GPU and screen justify it
   useEffect(() => {
-    const m = maps.manifest;
-    const big = tier === 'high' && gl.capabilities.maxTextureSize >= 8192 && window.matchMedia('(min-width: 900px)').matches;
-    if (!m || !big) return;
     let cancelled = false;
     const owned: THREE.Texture[] = [];
-    const queue: ['uDay' | 'uClouds' | 'uNight', string, boolean][] = [
-      ['uDay', `${DIR}${m.day}-8k.jpg`, true],
-      ['uClouds', `${DIR}clouds-8k.jpg`, false],
-      ['uNight', `${DIR}night-8k.jpg`, true],
-    ];
-    let stopIdle = () => {};
-    const next = () => {
-      const job = queue.shift();
-      if (!job || cancelled) return;
-      load(job[1], job[2])
-        .then((t) => {
-          if (cancelled) return t.dispose();
-          owned.push(t);
-          // Upload now, while idle, rather than on the next frame that happens to draw it
-          gl.initTexture(t);
-          uniforms[job[0]].value = t;
-          stopIdle = whenIdle(next);
-        })
-        .catch(() => undefined);
+    const use = (key: 'uDay' | 'uNight' | 'uClouds' | 'uRelief', t: THREE.Texture) => {
+      if (cancelled) return t.dispose();
+      owned.push(t);
+      uniforms[key].value = t;
+      if (key === 'uClouds') uniforms.uCloudsChannel.value = 0;
+      if (key === 'uRelief') uniforms.uHasRelief.value = 1;
     };
-    stopIdle = whenIdle(next);
+    (async () => {
+      const res = await fetch(asset('/textures/earth/manifest.json')).catch(() => null);
+      if (!res?.ok) return;
+      const m = (await res.json()) as TextureManifest;
+      const dir = asset('/textures/earth/');
+      const small: Promise<unknown>[] = [];
+      if (m.day) small.push(load(`${dir}${m.day}-2k.jpg`, true).then((t) => use('uDay', t)));
+      if (m.night) small.push(load(`${dir}night-2k.jpg`, true).then((t) => use('uNight', t)));
+      if (m.clouds) small.push(load(`${dir}clouds-2k.jpg`, false).then((t) => use('uClouds', t)));
+      if (m.relief) small.push(load(`${dir}${m.relief}`, false).then((t) => use('uRelief', t)));
+      await Promise.allSettled(small);
+
+      const big = gl.capabilities.maxTextureSize >= 8192 && window.matchMedia('(min-width: 900px)').matches;
+      if (!big || cancelled) return;
+      if (m.day) load(`${dir}${m.day}-8k.jpg`, true).then((t) => use('uDay', t), () => undefined);
+      if (m.clouds) load(`${dir}clouds-8k.jpg`, false).then((t) => use('uClouds', t), () => undefined);
+      if (m.night) load(`${dir}night-8k.jpg`, true).then((t) => use('uNight', t), () => undefined);
+    })().catch(() => undefined);
     return () => {
       cancelled = true;
-      stopIdle();
-      uniforms.uDay.value = maps.day;
-      uniforms.uClouds.value = maps.clouds;
-      uniforms.uNight.value = maps.night;
       owned.forEach((t) => t.dispose());
     };
-  }, [maps, tier, uniforms, gl]);
+  }, [uniforms, gl]);
 
   const limbUniforms = useMemo(
     () => ({ uSun: { value: sun }, uIntensity: { value: RADIANCE * 1.1 }, uThickness: { value: 0.32 } }),
@@ -207,7 +142,7 @@ export const Earth = forwardRef<THREE.Group, EarthProps>(function Earth({ radius
       else if (ref) ref.current = g;
     }}>
       <mesh>
-        <sphereGeometry args={tier === 'low' ? [radius, 128, 80] : [radius, 192, 128]} />
+        <sphereGeometry args={[radius, 192, 128]} />
         <shaderMaterial uniforms={uniforms} vertexShader={surfaceVertex} fragmentShader={surfaceFragment} />
       </mesh>
       {children}
@@ -215,3 +150,5 @@ export const Earth = forwardRef<THREE.Group, EarthProps>(function Earth({ radius
     </>
   );
 });
+
+useTexture.preload(Object.values(BASE));

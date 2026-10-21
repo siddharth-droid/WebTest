@@ -9,8 +9,6 @@ import { propagate } from 'satellite.js';
 import { Earth } from '@/components/canvas/Earth';
 import { Satellite, type ModelId } from '@/components/canvas/Satellite';
 import { GlobeAtmosphere, GlobeEffects } from '@/components/globe/Globe';
-import { AdaptiveQuality } from '@/components/canvas/AdaptiveQuality';
-import { dprRange, getTier, useTier } from '@/lib/quality';
 import { RADIANCE } from '@/components/globe/units';
 import { eventColor } from '@/lib/events';
 import { earthRotation, eciToScene, latLonToScene, sunDirection } from '@/lib/sat/astro';
@@ -148,7 +146,6 @@ function SelectedSatellite({ sat, showOrbit, sun }: { sat: SatelliteRecord; show
     group.current.up.copy(p).normalize();
     group.current.lookAt(ahead);
   });
-  const tier = useTier();
 
   return (
     <>
@@ -157,7 +154,7 @@ function SelectedSatellite({ sat, showOrbit, sun }: { sat: SatelliteRecord; show
         {model && (
           <Suspense fallback={null}>
             {/* Drawn ~150× life size so it is visible at follow distance */}
-            <Satellite model={model} size={0.016} float={false} sun={sun} shadows={tier === 'high'} reflections />
+            <Satellite model={model} size={0.016} float={false} sun={sun} shadows reflections />
           </Suspense>
         )}
         <Html zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
@@ -235,21 +232,19 @@ export default function TrackScene(props: TrackSceneProps) {
   const { catalog, live, visibleCategories, selected, hovered, onSelect, onHover, onDeselect, observer, aurora, events, showOrbit } = props;
   const sun = useMemo(() => sunDirection(new Date()), []);
   const earth = useRef<THREE.Group>(null);
-  const tier = useTier();
 
   return (
     <div className="stage">
       <Canvas
-        shadows={tier === 'high'}
+        shadows
         flat
-        dpr={dprRange(getTier())[1]}
+        dpr={[1, 2]}
         gl={{ antialias: false }}
         camera={{ fov: 40, near: 0.001, far: 3000, position: [1.2, 1.4, 3.0] }}
         raycaster={{ params: { Points: { threshold: 0.012 } } as THREE.Raycaster['params'] }}
         onPointerMissed={onDeselect}
         style={{ cursor: hovered !== null ? 'pointer' : 'grab' }}
       >
-        <AdaptiveQuality />
         <color attach="background" args={['#000000']} />
         <OrbitControls makeDefault enablePan={false} enableDamping dampingFactor={0.08} rotateSpeed={0.45} minDistance={selected ? 0.02 : 1.15} maxDistance={40} />
         <FollowRig selected={selected} />

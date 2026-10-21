@@ -5,11 +5,9 @@
  * scene reads them every frame in useFrame. Nothing here is React state, so
  * scrolling never triggers a re-render.
  *
- * The scene is live: the ISS, the Sun and the Earth's rotation all come from
- * the real clock. Scrolling adds `minutes` to "now", so riding along the orbit
- * is the station's actual next ~45 minutes. The camera is expressed in the
- * station's own frame (forward = direction of travel, up = away from Earth,
- * side = to the right), so following it is just a matter of animating time.
+ * The camera is expressed in the station's own frame (forward = direction of
+ * travel, up = away from Earth, side = to the right), so "follow the ISS
+ * along its orbit" is just animating `orbitU` while the offsets stay put.
  */
 export interface Frame {
   /** Behind (−forward), above (+up), right (+side), in scene units. */
@@ -18,17 +16,9 @@ export interface Frame {
   side: number;
 }
 
-/** Where the sunrise chapter sits on the scripted timeline. */
-export const SUNRISE_MINUTES = 46;
-
 export const story = {
-  /** How far ahead of the real clock to show, in scripted minutes (see `timeScale`). */
-  minutes: 0,
-  /**
-   * Real minutes per scripted minute. The scene stretches or squeezes the ride
-   * so the sunrise chapter lands on the station's actual next orbital sunrise.
-   */
-  timeScale: 1,
+  /** Position along the orbit, radians. */
+  orbitU: 0.5,
   cam: { back: 0.46, up: 0.1, side: -0.2 } as Frame,
   /** Look target relative to the station: ahead, up, side. */
   look: { ahead: 0, up: -0.02, side: -0.04 },
@@ -41,8 +31,6 @@ export const story = {
   frameX: 0.27,
   intro: 1,
   labels: { a: 0, b: 0, c: 0 },
-  /** Written by the scene for the DOM: where the station is at the shown moment. */
-  live: { lat: 0, lon: 0, alt: 0, sunlit: true, ready: false },
 };
 
 export type HotspotKey = keyof typeof story.labels;
@@ -50,7 +38,7 @@ export type HotspotKey = keyof typeof story.labels;
 type Chapter = {
   id: string;
   label: string;
-  minutes?: number;
+  orbitU?: number;
   cam?: Frame;
   look?: { ahead: number; up: number; side: number };
   sat?: { yaw: number; pitch: number; roll: number };
@@ -66,7 +54,7 @@ export const CHAPTERS: Chapter[] = [
   {
     id: 'station',
     label: 'The ISS',
-    minutes: 0.6,
+    orbitU: 0.62,
     cam: { back: 0.24, up: 0.09, side: 0.22 },
     look: { ahead: 0, up: 0.0, side: 0.04 },
     sat: { yaw: -0.35, pitch: 0.05, roll: 0 },
@@ -76,14 +64,13 @@ export const CHAPTERS: Chapter[] = [
   {
     id: 'sunrise',
     label: '16 sunrises',
-    // Scripted to the station's next real sunrise (StoryScene sets `timeScale` so this lands on it)
-    minutes: SUNRISE_MINUTES,
+    orbitU: 1.95,
     cam: { back: 0.42, up: 0.09, side: -0.04 },
     // The horizon sits ~20° below level from this altitude: aim at it
     look: { ahead: 1.6, up: -0.64, side: 0 },
     sat: { yaw: 0, pitch: 0, roll: 0 },
     frameX: -0.2,
   },
-  { id: 'everything', label: 'Everything', minutes: 50, global: 1, constellation: 1, frameX: -0.2 },
-  { id: 'explore', label: 'Explore', minutes: 54, global: 0.82, constellation: 0.35, frameX: 0.16 },
+  { id: 'everything', label: 'Everything', orbitU: 2.3, global: 1, constellation: 1, frameX: -0.2 },
+  { id: 'explore', label: 'Explore', orbitU: 2.5, global: 0.82, constellation: 0.35, frameX: 0.16 },
 ];

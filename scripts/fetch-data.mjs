@@ -263,19 +263,6 @@ const results = {
   'space-weather.json': await produce('space-weather.json', spaceWeather),
   'events.json': await produce('events.json', earthEvents),
 };
-// A few headline spacecraft as a tiny file, so the landing page can show the real ISS
-// without downloading the whole catalog
-try {
-  const sats = JSON.parse(await readFile(join(OUT, 'satellites.json'), 'utf8'));
-  const iNorad = sats.fields.indexOf('NORAD_CAT_ID');
-  const omm = (row) => Object.fromEntries(sats.fields.slice(0, -2).map((f, i) => [f, row[i]]));
-  const pick = (id) => sats.rows.find((r) => r[iNorad] === id);
-  const featured = [25544, 48274, 20580].map(pick).filter(Boolean).map(omm);
-  await write('featured.json', { fetchedAt: sats.fetchedAt, satellites: featured });
-} catch (err) {
-  console.warn(`! featured: ${err.message}`);
-}
-
 const count = async (name, fn) => {
   try {
     return fn(JSON.parse(await readFile(join(OUT, name), 'utf8')));
